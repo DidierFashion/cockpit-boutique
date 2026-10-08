@@ -1,75 +1,51 @@
-# React + TypeScript + Vite
+# 🚗 Cockpit Boutique
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> Application de gestion de boutique inspirée des tableaux de bord automobiles.
 
-Currently, two official plugins are available:
+## 📋 Description
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Cockpit Boutique est un système de gestion interne pour petites et moyennes boutiques. Cette application permet de **planifier**, **organiser**, **diriger** et **contrôler** toutes les activités de la boutique.
 
-## React Compiler
+## ✨ Fonctionnalités (Module 3 — RH)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 👥 Gestion des employés
+- Ajout d'employés avec nom, poste et scores
+- Fiche employé détaillée (au clic)
+- Suppression d'employés
 
-## Expanding the ESLint configuration
+### 🎯 Système de motivation
+- Calcul automatique du score de motivation en %
+- Pondération : 30% présence + 25% ponctualité + 45% productivité
+- Code couleur : 🟢 Vert (≥80%) / 🟠 Orange (60-79%) / 🔴 Rouge (<60%)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 🕐 Module de pointage
+- Check-in / Check-out en temps réel
+- Détection automatique des retards
+- Historique du jour
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 📅 Calendrier de planification
+- Vue hebdomadaire (7 jours)
+- 3 shifts : Matin / Après-midi / Nuit
+- Assignation par jour et par shift
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### 📊 Tableau de bord
+- 3 cartes KPI (Présents / Retards / Absents)
+- Jauge de motivation globale
+- Classement automatique
+- Recommandations automatiques
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🛠️ Technologies
 
-```
+- **React** + **TypeScript**
+- **Vite** (build tool)
+- **Tailwind CSS** v4
+- **Lucide React** (icônes)
+- **Git** + **GitHub**
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+## 🚀 Installation
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
+```bash
+git clone https://github.com/DidierFashion/cockpit-boutique.git
+cd cockpit-boutique
+npm install
+npm run dev
