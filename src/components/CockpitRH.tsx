@@ -9,6 +9,27 @@ const EMPLOYES_INITIAUX = [
   { id: 5, nom: 'Aïcha B.', poste: 'Vendeuse', presence: 88, ponctualite: 82, productivite: 79 },
 ];
 
+const useLocalStorage = (key: string, initialValue: any): [any, (value: any) => void] => {
+  const [value, setValue] = useState(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error('Erreur sauvegarde', e);
+    }
+  }, [key, value]);
+
+  return [value, setValue];
+};
+
 const calculerMotivation = (e: any) => Math.round(e.presence * 0.30 + e.ponctualite * 0.25 + e.productivite * 0.45);
 
 const getColor = (score: number) => {
@@ -56,12 +77,14 @@ const FormulaireEmploye = ({ onAjouter, onFermer }: any) => {
   const [presence, setPresence] = useState(80);
   const [ponctualite, setPonctualite] = useState(80);
   const [productivite, setProductivite] = useState(80);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nom.trim()) return;
     onAjouter({ nom, poste, presence, ponctualite, productivite });
     onFermer();
   };
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-md">
@@ -175,7 +198,7 @@ const FicheEmploye = ({ employe, onFermer, onSupprimer }: any) => {
 
 const ModulePointage = ({ employes }: any) => {
   const [heure, setHeure] = useState(new Date());
-  const [pointages, setPointages] = useState<any[]>([]);
+  const [pointages, setPointages] = useLocalStorage('cockpit-pointages', [] as any[]);
   const [employeChoisi, setEmployeChoisi] = useState('');
 
   useEffect(() => {
@@ -203,9 +226,9 @@ const ModulePointage = ({ employes }: any) => {
     setEmployeChoisi('');
   };
 
-  const pointagesIn = pointages.filter(p => p.type === 'in');
-  const pointagesOut = pointages.filter(p => p.type === 'out');
-  const retards = pointagesIn.filter(p => p.statut === 'Retard').length;
+  const pointagesIn = pointages.filter((p: any) => p.type === 'in');
+  const pointagesOut = pointages.filter((p: any) => p.type === 'out');
+  const retards = pointagesIn.filter((p: any) => p.statut === 'Retard').length;
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
@@ -255,7 +278,7 @@ const ModulePointage = ({ employes }: any) => {
           <p className="text-sm text-slate-500 italic text-center py-4">Aucun pointage enregistré aujourd'hui</p>
         ) : (
           <div className="space-y-2 max-h-48 overflow-y-auto">
-            {pointages.map(p => (
+            {pointages.map((p: any) => (
               <div key={p.id} className="flex items-center justify-between bg-slate-800/50 rounded-lg p-3 text-sm">
                 <div className="flex items-center gap-3">
                   {p.type === 'in' ? <LogIn size={16} className="text-green-400" /> : <LogOut size={16} className="text-orange-400" />}
@@ -287,7 +310,7 @@ const ModuleCalendrier = ({ employes }: any) => {
     { nom: 'Nuit', couleur: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
   ];
 
-  const [planning, setPlanning] = useState<any[]>([]);
+  const [planning, setPlanning] = useLocalStorage('cockpit-planning', [] as any[]);
   const [jourChoisi, setJourChoisi] = useState('Lundi');
   const [shiftChoisi, setShiftChoisi] = useState('Matin');
   const [employeChoisi, setEmployeChoisi] = useState('');
@@ -296,7 +319,7 @@ const ModuleCalendrier = ({ employes }: any) => {
     if (!employeChoisi) return;
     const emp = employes.find((e: any) => e.nom === employeChoisi);
     if (!emp) return;
-    const existeDeja = planning.some(p => p.jour === jourChoisi && p.shift === shiftChoisi && p.employe === emp.nom);
+    const existeDeja = planning.some((p: any) => p.jour === jourChoisi && p.shift === shiftChoisi && p.employe === emp.nom);
     if (existeDeja) return;
     setPlanning([...planning, {
       id: Date.now(),
@@ -309,7 +332,7 @@ const ModuleCalendrier = ({ employes }: any) => {
   };
 
   const supprimerCreneau = (id: number) => {
-    setPlanning(planning.filter(p => p.id !== id));
+    setPlanning(planning.filter((p: any) => p.id !== id));
   };
 
   const getShiftStyle = (nom: string) => SHIFTS.find(s => s.nom === nom)?.couleur || 'bg-slate-800 text-slate-300';
@@ -350,7 +373,7 @@ const ModuleCalendrier = ({ employes }: any) => {
 
       <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
         {JOURS.map(jour => {
-          const creneauxJour = planning.filter(p => p.jour === jour);
+          const creneauxJour = planning.filter((p: any) => p.jour === jour);
           return (
             <div key={jour} className="bg-slate-800/30 border border-slate-800 rounded-lg p-3 min-h-[120px]">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 pb-2 border-b border-slate-700">
@@ -360,7 +383,7 @@ const ModuleCalendrier = ({ employes }: any) => {
                 {creneauxJour.length === 0 ? (
                   <p className="text-[10px] text-slate-600 italic">Libre</p>
                 ) : (
-                  creneauxJour.map(c => (
+                  creneauxJour.map((c: any) => (
                     <div key={c.id} className={`text-[10px] px-2 py-1 rounded border flex items-center justify-between gap-1 ${getShiftStyle(c.shift)}`}>
                       <div className="flex-1 truncate">
                         <div className="font-bold truncate">{c.employe}</div>
@@ -379,20 +402,21 @@ const ModuleCalendrier = ({ employes }: any) => {
     </div>
   );
 };
+
 export default function CockpitRH() {
-  const [employes, setEmployes] = useState(EMPLOYES_INITIAUX);
+  const [employes, setEmployes] = useLocalStorage('cockpit-employes', EMPLOYES_INITIAUX);
   const [showForm, setShowForm] = useState(false);
   const [employeSelectionne, setEmployeSelectionne] = useState<any>(null);
 
   const moyenneMotivation = employes.length > 0
-    ? Math.round(employes.reduce((acc, e) => acc + calculerMotivation(e), 0) / employes.length)
+    ? Math.round(employes.reduce((acc: number, e: any) => acc + calculerMotivation(e), 0) / employes.length)
     : 0;
-  const presents = employes.filter(e => e.presence >= 80).length;
-  const retards = employes.filter(e => e.ponctualite < 80 && e.ponctualite >= 60).length;
-  const absents = employes.filter(e => e.presence < 60).length;
+  const presents = employes.filter((e: any) => e.presence >= 80).length;
+  const retards = employes.filter((e: any) => e.ponctualite < 80 && e.ponctualite >= 60).length;
+  const absents = employes.filter((e: any) => e.presence < 60).length;
 
   const ajouterEmploye = (data: any) => setEmployes([...employes, { id: Date.now(), ...data }]);
-  const supprimerEmploye = (id: number) => setEmployes(employes.filter(e => e.id !== id));
+  const supprimerEmploye = (id: number) => setEmployes(employes.filter((e: any) => e.id !== id));
 
   return (
     <div className="min-h-screen bg-[#0A0E1A] text-slate-100 p-6">
@@ -414,6 +438,7 @@ export default function CockpitRH() {
       </div>
 
       <ModulePointage employes={employes} />
+
       <ModuleCalendrier employes={employes} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -433,7 +458,7 @@ export default function CockpitRH() {
             <TrendingUp size={16} /> Classement des employés
           </h2>
           <div className="space-y-3">
-            {employes.slice().sort((a, b) => calculerMotivation(b) - calculerMotivation(a)).map((emp, idx) => {
+            {employes.slice().sort((a: any, b: any) => calculerMotivation(b) - calculerMotivation(a)).map((emp: any, idx: number) => {
               const score = calculerMotivation(emp);
               const c = getColor(score);
               return (
@@ -462,7 +487,7 @@ export default function CockpitRH() {
           <Zap size={16} className="text-yellow-400" /> Recommandations automatiques
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {employes.filter(e => calculerMotivation(e) < 60).map(emp => (
+          {employes.filter((e: any) => calculerMotivation(e) < 60).map((emp: any) => (
             <div key={emp.id} className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1">
                 <AlertTriangle size={14} className="text-red-400" />
@@ -471,7 +496,7 @@ export default function CockpitRH() {
               <p className="text-xs text-slate-400">Score {calculerMotivation(emp)}%. Action : entretien individuel + plan de motivation 30 jours.</p>
             </div>
           ))}
-          {employes.filter(e => calculerMotivation(e) >= 60 && calculerMotivation(e) < 80).map(emp => (
+          {employes.filter((e: any) => calculerMotivation(e) >= 60 && calculerMotivation(e) < 80).map((emp: any) => (
             <div key={emp.id} className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1">
                 <Clock size={14} className="text-orange-400" />
@@ -480,7 +505,7 @@ export default function CockpitRH() {
               <p className="text-xs text-slate-400">Score {calculerMotivation(emp)}%. Action : entretien + formation ciblée.</p>
             </div>
           ))}
-          {employes.filter(e => calculerMotivation(e) >= 80).map(emp => (
+          {employes.filter((e: any) => calculerMotivation(e) >= 80).map((emp: any) => (
             <div key={emp.id} className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1">
                 <TrendingUp size={14} className="text-green-400" />
