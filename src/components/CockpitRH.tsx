@@ -195,7 +195,220 @@ const FicheEmploye = ({ employe, onFermer, onSupprimer }: any) => {
     </div>
   );
 };
+const ModuleProduits = () => {
+  const CATEGORIES = ['Vêtements', 'Chaussures', 'Accessoires', 'Alimentation', 'Électronique', 'Autre'];
+  const [produits, setProduits] = useLocalStorage('cockpit-produits', [] as any[]);
+  const [recherche, setRecherche] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    nom: '',
+    categorie: 'Vêtements',
+    prix: 0,
+    quantite: 0,
+  });
 
+  const produitsFiltres = produits.filter((p: any) =>
+    p.nom.toLowerCase().includes(recherche.toLowerCase())
+  );
+
+  const valeurTotale = produits.reduce((acc: number, p: any) => acc + (p.prix * p.quantite), 0);
+  const produitsEnRupture = produits.filter((p: any) => p.quantite < 5).length;
+
+  const ajouterProduit = () => {
+    if (!formData.nom.trim()) return;
+    setProduits([...produits, {
+      id: Date.now(),
+      ...formData,
+    }]);
+    setFormData({ nom: '', categorie: 'Vêtements', prix: 0, quantite: 0 });
+    setShowForm(false);
+  };
+
+  const supprimerProduit = (id: number) => {
+    setProduits(produits.filter((p: any) => p.id !== id));
+  };
+
+  const modifierQuantite = (id: number, delta: number) => {
+    setProduits(produits.map((p: any) =>
+      p.id === id ? { ...p, quantite: Math.max(0, p.quantite + delta) } : p
+    ));
+  };
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
+      {/* En-tête */}
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <h2 className="text-sm uppercase tracking-wider text-slate-400 flex items-center gap-2">
+          <span className="text-cyan-400">📦</span> Module Produits
+        </h2>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold px-4 py-2 rounded-lg text-sm"
+        >
+          <Plus size={16} /> Nouveau produit
+        </button>
+      </div>
+
+      {/* Statistiques */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+          <p className="text-xs text-slate-400 uppercase mb-1">Total produits</p>
+          <p className="text-2xl font-bold text-cyan-400">{produits.length}</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+          <p className="text-xs text-slate-400 uppercase mb-1">Valeur du stock</p>
+          <p className="text-2xl font-bold text-green-400">{valeurTotale.toLocaleString('fr-FR')} FCFA</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+          <p className="text-xs text-slate-400 uppercase mb-1">En rupture (&lt; 5)</p>
+          <p className={`text-2xl font-bold ${produitsEnRupture > 0 ? 'text-red-400' : 'text-slate-400'}`}>
+            {produitsEnRupture}
+          </p>
+        </div>
+      </div>
+
+      {/* Formulaire */}
+      {showForm && (
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 mb-6">
+          <h3 className="text-sm font-bold text-white mb-3">Ajouter un produit</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input
+              type="text"
+              placeholder="Nom du produit"
+              value={formData.nom}
+              onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+              autoFocus
+            />
+            <select
+              value={formData.categorie}
+              onChange={(e) => setFormData({ ...formData, categorie: e.target.value })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+            >
+              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <input
+              type="number"
+              placeholder="Prix (FCFA)"
+              value={formData.prix || ''}
+              onChange={(e) => setFormData({ ...formData, prix: Number(e.target.value) })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+            />
+            <input
+              type="number"
+              placeholder="Quantité"
+              value={formData.quantite || ''}
+              onChange={(e) => setFormData({ ...formData, quantite: Number(e.target.value) })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+            />
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => setShowForm(false)}
+              className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-2 rounded text-sm"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={ajouterProduit}
+              disabled={!formData.nom.trim()}
+              className="flex-1 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold py-2 rounded text-sm"
+            >
+              Ajouter
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Recherche */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="🔍 Rechercher un produit..."
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+        />
+      </div>
+
+      {/* Liste des produits */}
+      {produitsFiltres.length === 0 ? (
+        <p className="text-sm text-slate-500 italic text-center py-6">
+          {produits.length === 0
+            ? 'Aucun produit enregistré. Cliquez sur "+ Nouveau produit" pour commencer.'
+            : 'Aucun produit ne correspond à votre recherche.'}
+        </p>
+      ) : (
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {produitsFiltres.map((p: any) => {
+            const enRupture = p.quantite < 5;
+            return (
+              <div key={p.id}
+                className={`flex items-center justify-between gap-3 bg-slate-800/50 border rounded-lg p-3 ${
+                  enRupture ? 'border-red-500/40' : 'border-slate-700'
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-white font-bold text-sm">{p.nom}</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300">
+                      {p.categorie}
+                    </span>
+                    {enRupture && (
+                      <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400 font-bold">
+                        ⚠️ Rupture
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {p.prix.toLocaleString('fr-FR')} FCFA l'unité
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => modifierQuantite(p.id, -1)}
+                    className="w-7 h-7 flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-white rounded font-bold"
+                  >
+                    −
+                  </button>
+                  <span className={`text-sm font-bold w-10 text-center ${
+                    enRupture ? 'text-red-400' : 'text-white'
+                  }`}>
+                    {p.quantite}
+                  </span>
+                  <button
+                    onClick={() => modifierQuantite(p.id, 1)}
+                    className="w-7 h-7 flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-white rounded font-bold"
+                  >
+                    +
+                  </button>
+                </div>
+
+                <div className="text-right min-w-[100px]">
+                  <p className="text-xs text-slate-400">Valeur</p>
+                  <p className="text-sm font-bold text-cyan-400">
+                    {(p.prix * p.quantite).toLocaleString('fr-FR')}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => supprimerProduit(p.id)}
+                  className="text-red-400 hover:text-red-300 p-2"
+                  title="Supprimer"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+<ModuleProduits />
 const ModulePointage = ({ employes }: any) => {
   const [heure, setHeure] = useState(new Date());
   const [pointages, setPointages] = useLocalStorage('cockpit-pointages', [] as any[]);
@@ -439,6 +652,7 @@ export default function CockpitRH() {
 
       <ModulePointage employes={employes} />
 
+      <ModuleProduits />
       <ModuleCalendrier employes={employes} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
