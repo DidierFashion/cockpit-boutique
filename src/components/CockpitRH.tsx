@@ -195,9 +195,9 @@ const FicheEmploye = ({ employe, onFermer, onSupprimer }: any) => {
     </div>
   );
 };
-const ModuleProduits = () => {
+const ModuleProduits = ({produits, setProduits }:any) => {
   const CATEGORIES = ['Vêtements', 'Chaussures', 'Accessoires', 'Alimentation', 'Électronique', 'Autre'];
-  const [produits, setProduits] = useLocalStorage('cockpit-produits', [] as any[]);
+  
   const [recherche, setRecherche] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -408,7 +408,6 @@ const ModuleProduits = () => {
   );
 };
 
-<ModuleProduits />
 const ModulePointage = ({ employes }: any) => {
   const [heure, setHeure] = useState(new Date());
   const [pointages, setPointages] = useLocalStorage('cockpit-pointages', [] as any[]);
@@ -620,6 +619,7 @@ export default function CockpitRH() {
   const [employes, setEmployes] = useLocalStorage('cockpit-employes', EMPLOYES_INITIAUX);
   const [showForm, setShowForm] = useState(false);
   const [employeSelectionne, setEmployeSelectionne] = useState<any>(null);
+  const [produits, setProduits] = useLocalStorage('cockpit-produits', [] as any[]);
 
   const moyenneMotivation = employes.length > 0
     ? Math.round(employes.reduce((acc: number, e: any) => acc + calculerMotivation(e), 0) / employes.length)
@@ -652,7 +652,8 @@ export default function CockpitRH() {
 
       <ModulePointage employes={employes} />
 
-      <ModuleProduits />
+      <ModuleVentes produuits={produits} setProduits={setProduits}/>
+      <ModuleProduits produuits={produits} setProduits={setProduits}/>
       <ModuleCalendrier employes={employes} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -738,3 +739,188 @@ export default function CockpitRH() {
     </div>
   );
 }
+const ModuleVentes = ({ produits, setProduits }: any) => {
+  const [ventes, setVentes] = useLocalStorage('cockpit-ventes', [] as any[]);
+  const [produitChoisi, setProduitChoisi] = useState('');
+  const [quantiteVente, setQuantiteVente] = useState(1);
+  const [message, setMessage] = useState('');
+
+  const venteDuJour = () => {
+    const aujourdHui = new Date().toLocaleDateString('fr-FR');
+    return ventes.filter((v: any) => v.date === aujourdHui);
+  };
+
+  const venteDuMois = () => {
+    const moisActuel = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    return ventes.filter((v: any) => v.mois === moisActuel);
+  };
+
+  const caDuJour = venteDuJour().reduce((acc: number, v: any) => acc + v.total, 0);
+  const caDuMois = venteDuMois().reduce((acc: number, v: any) => acc + v.total, 0);
+  const nbVentesJour = venteDuJour().length;
+  const panierMoyen = nbVentesJour > 0 ? Math.round(caDuJour / nbVentesJour) : 0;
+
+  const enregistrerVente = () => {
+    if (!produitChoisi) return;
+    const produit = produits.find((p: any) => p.nom === produitChoisi);
+    if (!produit) return;
+    if (quantiteVente > produit.quantite) {
+      setMessage(`❌ Stock insuffisant (${produit.quantite} disponible)`);
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    const maintenant = new Date();
+    const dateStr = maintenant.toLocaleDateString('fr-FR');
+    const moisStr = maintenant.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    const heureStr = maintenant.toLocaleTimeString('fr-FR').substring(0, 5);
+    const total = produit.prix * quantiteVente;
+    const nouvelleVente = {
+      id: Date.now(),
+      date: dateStr,
+      mois: moisStr,
+      heure: heureStr,
+      produit: produit.nom,
+      categorie: produit.categorie,
+      quantite: quantiteVente,
+      prixUnitaire: produit.prix,
+      total,
+    };
+    setVentes([nouvelleVente, ...ventes]);
+    setProduits(produits.map((p: any) =>
+      p.nom === produitChoisi ? { ...p, quantite: p.quantite - quantiteVente } : p
+    ));
+    setMessage(`✅ Vente : ${produit.nom} × ${quantiteVente} = ${total.toLocaleString('fr-FR')} FCFA`);
+    setTimeout(() => setMessage(''), 3000);
+    setProduitChoisi('');
+    setQuantiteVente(1);
+  };
+
+  const supprimerVente = (id: number) => {
+    setVentes(ventes.filter((v: any) => v.id !== id));
+  };
+
+  const produitsDisponibles = produits.filter((p: any) => p.quantite > 0);
+
+  const topProduits = () => {
+    const compteur: any = {};
+    ventes.forEach((v: any) => {
+      if (!compteur[v.produit]) compteur[v.produit] = { qte: 0, ca: 0 };
+      compteur[v.produit].qte += v.quantite;
+      compteur[v.produit].ca += v.total;
+    });
+    return Object.entries(compteur)
+      .map(([nom, data]: any) => ({ nom, ...data }))
+      .sort((a: any, b: any) => b.qte - a.qte)
+      .slice(0, 5);
+  };
+
+  const produitSelectionne = produits.find((p: any) => p.nom === produitChoisi);
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-sm uppercase tracking-wider text-slate-400 flex items-center gap-2">
+          <span className="text-cyan-400">💰</span> Module Ventes
+        </h2>
+        <div className="text-xs text-slate-500">{ventes.length} vente(s) enregistrée(s)</div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+          <p className="text-xs text-slate-400 uppercase mb-1">CA du jour</p>
+          <p className="text-lg font-bold text-green-400">{caDuJour.toLocaleString('fr-FR')}</p>
+          <p className="text-[10px] text-slate-500">FCFA</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+          <p className="text-xs text-slate-400 uppercase mb-1">CA du mois</p>
+          <p className="text-lg font-bold text-cyan-400">{caDuMois.toLocaleString('fr-FR')}</p>
+          <p className="text-[10px] text-slate-500">FCFA</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+          <p className="text-xs text-slate-400 uppercase mb-1">Ventes du jour</p>
+          <p className="text-lg font-bold text-white">{nbVentesJour}</p>
+          <p className="text-[10px] text-slate-500">transactions</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+          <p className="text-xs text-slate-400 uppercase mb-1">Panier moyen</p>
+          <p className="text-lg font-bold text-orange-400">{panierMoyen.toLocaleString('fr-FR')}</p>
+          <p className="text-[10px] text-slate-500">FCFA</p>
+        </div>
+      </div>
+
+      <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-4 mb-6">
+        <h3 className="text-xs uppercase tracking-wider text-slate-400 mb-3">🛒 Nouvelle vente</h3>
+        <div className="flex flex-col md:flex-row gap-3">
+          <select value={produitChoisi} onChange={(e) => setProduitChoisi(e.target.value)}
+            className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-3 text-white">
+            <option value="">— Sélectionner un produit —</option>
+            {produitsDisponibles.map((p: any) => (
+              <option key={p.id} value={p.nom}>
+                {p.nom} — {p.prix.toLocaleString('fr-FR')} FCFA ({p.quantite} en stock)
+              </option>
+            ))}
+          </select>
+          <input type="number" min="1" value={quantiteVente}
+            onChange={(e) => setQuantiteVente(Math.max(1, Number(e.target.value)))}
+            className="w-full md:w-24 bg-slate-800 border border-slate-700 rounded px-3 py-3 text-white text-center" />
+          <button onClick={enregistrerVente} disabled={!produitChoisi}
+            className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold px-6 py-3 rounded">
+            💵 Vendre
+          </button>
+        </div>
+        {produitSelectionne && quantiteVente > 0 && (
+          <div className="mt-3 text-sm text-slate-400">
+            Total : <span className="text-green-400 font-bold">
+              {(produitSelectionne.prix * quantiteVente).toLocaleString('fr-FR')} FCFA
+            </span>
+          </div>
+        )}
+        {message && (
+          <div className="mt-3 text-sm text-center py-2 px-3 rounded bg-slate-700/50 text-white">{message}</div>
+        )}
+      </div>
+
+      {ventes.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-3">📋 Dernières ventes</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {ventes.slice(0, 10).map((v: any) => (
+                <div key={v.id} className="flex items-center justify-between gap-2 bg-slate-800/50 rounded-lg p-2 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-slate-500 font-mono">{v.heure}</span>
+                    <span className="text-white truncate">{v.produit}</span>
+                    <span className="text-slate-500">×{v.quantite}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-400 font-bold">{v.total.toLocaleString('fr-FR')}</span>
+                    <button onClick={() => supprimerVente(v.id)} className="text-red-400 hover:text-red-300">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-3">🏆 Top 5 produits</h3>
+            <div className="space-y-2">
+              {topProduits().map((p: any, idx: number) => (
+                <div key={p.nom} className="flex items-center justify-between gap-2 bg-slate-800/50 rounded-lg p-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 font-bold">#{idx + 1}</span>
+                    <span className="text-white truncate">{p.nom}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-cyan-400 font-bold">×{p.qte}</div>
+                    <div className="text-slate-500">{p.ca.toLocaleString('fr-FR')} F</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
