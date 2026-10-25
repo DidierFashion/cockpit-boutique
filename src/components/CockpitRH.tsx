@@ -652,6 +652,7 @@ export default function CockpitRH() {
 
       <ModulePointage employes={employes} />
 
+      <ModuleFinance />
       <ModuleVentes produuits={produits} setProduits={setProduits}/>
       <ModuleProduits produuits={produits} setProduits={setProduits}/>
       <ModuleCalendrier employes={employes} />
@@ -924,3 +925,127 @@ const ModuleVentes = ({ produits, setProduits }: any) => {
     </div>
   );
 };
+const ModuleFinance = () => {
+  const [depenses, setDepenses] = useLocalStorage('cockpit-depenses', [] as any[]);
+  const [ventes] = useLocalStorage('cockpit-ventes', [] as any[]);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({ description: '', categorie: 'Loyer', montant: 0 });
+
+  const CATEGORIES_DEPENSES = ['Loyer', 'Électricité', 'Eau', 'Salaires', 'Transport', 'Fournisseurs', 'Autre'];
+
+  // Calculs Ventes
+  const aujourdHui = new Date().toLocaleDateString('fr-FR');
+  const moisActuel = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+  const caJour = ventes.filter((v: any) => v.date === aujourdHui).reduce((acc: number, v: any) => acc + v.total, 0);
+  const caMois = ventes.filter((v: any) => v.mois === moisActuel).reduce((acc: number, v: any) => acc + v.total, 0);
+
+  // Calculs Dépenses
+  const depensesJour = depenses.filter((d: any) => d.date === aujourdHui).reduce((acc: number, d: any) => acc + d.montant, 0);
+  const depensesMois = depenses.filter((d: any) => d.mois === moisActuel).reduce((acc: number, d: any) => acc + d.montant, 0);
+
+  // Bénéfice Net
+  const beneficeJour = caJour - depensesJour;
+  const beneficeMois = caMois - depensesMois;
+
+  const ajouterDepense = () => {
+    if (!formData.description.trim() || formData.montant <= 0) return;
+    const maintenant = new Date();
+    const nouvelleDepense = {
+      id: Date.now(),
+      date: maintenant.toLocaleDateString('fr-FR'),
+      mois: maintenant.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+      ...formData,
+    };
+    setDepenses([nouvelleDepense, ...depenses]);
+    setFormData({ description: '', categorie: 'Loyer', montant: 0 });
+    setShowForm(false);
+  };
+
+  const supprimerDepense = (id: number) => setDepenses(depenses.filter((d: any) => d.id !== id));
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-sm uppercase tracking-wider text-slate-400 flex items-center gap-2">
+          <span className="text-cyan-400">💰</span> Module Finance
+        </h2>
+        <button onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold px-4 py-2 rounded-lg text-sm">
+          <Plus size={16} /> Nouvelle dépense
+        </button>
+      </div>
+
+      {/* Cartes Bénéfice Net */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className={`rounded-xl p-4 border ${beneficeJour >= 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+          <p className="text-xs uppercase text-slate-400 mb-1">Bénéfice Net (Aujourd'hui)</p>
+          <p className={`text-2xl font-bold ${beneficeJour >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {beneficeJour.toLocaleString('fr-FR')} FCFA
+          </p>
+          <div className="text-[10px] text-slate-500 mt-1 flex gap-2">
+            <span>CA: {caJour.toLocaleString()}</span>
+            <span>- Dépenses: {depensesJour.toLocaleString()}</span>
+          </div>
+        </div>
+        <div className={`rounded-xl p-4 border ${beneficeMois >= 0 ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+          <p className="text-xs uppercase text-slate-400 mb-1">Bénéfice Net (Ce mois)</p>
+          <p className={`text-2xl font-bold ${beneficeMois >= 0 ? 'text-cyan-400' : 'text-red-400'}`}>
+            {beneficeMois.toLocaleString('fr-FR')} FCFA
+          </p>
+          <div className="text-[10px] text-slate-500 mt-1 flex gap-2">
+            <span>CA: {caMois.toLocaleString()}</span>
+            <span>- Dépenses: {depensesMois.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Formulaire Dépense */}
+      {showForm && (
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 mb-6">
+          <h3 className="text-sm font-bold text-white mb-3">Ajouter une dépense</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input type="text" placeholder="Description (ex: Loyer boutique)" value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm" />
+            <select value={formData.categorie}
+              onChange={(e) => setFormData({ ...formData, categorie: e.target.value })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm">
+              {CATEGORIES_DEPENSES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <input type="number" placeholder="Montant (FCFA)" value={formData.montant || ''}
+              onChange={(e) => setFormData({ ...formData, montant: Number(e.target.value) })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm" />
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button onClick={() => setShowForm(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-2 rounded text-sm">Annuler</button>
+            <button onClick={ajouterDepense} disabled={!formData.description || formData.montant <= 0}
+              className="flex-1 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold py-2 rounded text-sm">Enregistrer</button>
+          </div>
+        </div>
+      )}
+
+      {/* Liste Dépenses */}
+      <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-3">📋 Historique des dépenses</h3>
+      {depenses.length === 0 ? (
+        <p className="text-sm text-slate-500 italic text-center py-4">Aucune dépense enregistrée.</p>
+      ) : (
+        <div className="space-y-2 max-h-60 overflow-y-auto">
+          {depenses.map((d: any) => (
+            <div key={d.id} className="flex items-center justify-between gap-3 bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-sm">
+              <div>
+                <p className="text-white font-bold">{d.description}</p>
+                <p className="text-xs text-slate-500">{d.categorie} — {d.date}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-red-400 font-bold">- {d.montant.toLocaleString('fr-FR')} FCFA</span>
+                <button onClick={() => supprimerDepense(d.id)} className="text-slate-500 hover:text-red-400"><Trash2 size={14} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
