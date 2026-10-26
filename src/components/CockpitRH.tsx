@@ -207,12 +207,12 @@ const ModuleProduits = ({produits, setProduits }:any) => {
     quantite: 0,
   });
 
-  const produitsFiltres = produits.filter((p: any) =>
+  const produitsFiltres = (produits || []).filter((p: any) =>
     p.nom.toLowerCase().includes(recherche.toLowerCase())
   );
 
-  const valeurTotale = produits.reduce((acc: number, p: any) => acc + (p.prix * p.quantite), 0);
-  const produitsEnRupture = produits.filter((p: any) => p.quantite < 5).length;
+  const valeurTotale = (produits || []).reduce((acc: number, p: any) => acc + (p.prix * p.quantite), 0);
+  const produitsEnRupture = (produits || []).filter((p: any) => p.quantite < 5).length;
 
   const ajouterProduit = () => {
     if (!formData.nom.trim()) return;
@@ -253,11 +253,11 @@ const ModuleProduits = ({produits, setProduits }:any) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">Total produits</p>
-          <p className="text-2xl font-bold text-cyan-400">{produits.length}</p>
+          <p className="text-2xl font-bold text-cyan-400">{(produits|| []).length}</p>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">Valeur du stock</p>
-          <p className="text-2xl font-bold text-green-400">{valeurTotale.toLocaleString('fr-FR')} FCFA</p>
+          <p className="text-2xl font-bold text-green-400">((produits || []).length)</p>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">En rupture (&lt; 5)</p>
@@ -332,9 +332,9 @@ const ModuleProduits = ({produits, setProduits }:any) => {
       </div>
 
       {/* Liste des produits */}
-      {produitsFiltres.length === 0 ? (
+      {(produitsFiltres || []).length === 0 ? (
         <p className="text-sm text-slate-500 italic text-center py-6">
-          {produits.length === 0
+          {(produits || []).length === 0
             ? 'Aucun produit enregistré. Cliquez sur "+ Nouveau produit" pour commencer.'
             : 'Aucun produit ne correspond à votre recherche.'}
         </p>
@@ -800,7 +800,7 @@ const ModuleVentes = ({ produits, setProduits }: any) => {
     setVentes(ventes.filter((v: any) => v.id !== id));
   };
 
-  const produitsDisponibles = produits.filter((p: any) => p.quantite > 0);
+ const produitsDisponibles = (produits || []).filter((p: any) => p.quantite > 0);
 
   const topProduits = () => {
     const compteur: any = {};
@@ -815,7 +815,7 @@ const ModuleVentes = ({ produits, setProduits }: any) => {
       .slice(0, 5);
   };
 
-  const produitSelectionne = produits.find((p: any) => p.nom === produitChoisi);
+  const produitSelectionne = (produits || []).find((p: any) => p.nom === produitChoisi);
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
