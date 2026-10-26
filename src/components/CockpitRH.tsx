@@ -257,7 +257,7 @@ const ModuleProduits = ({produits, setProduits }:any) => {
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">Valeur du stock</p>
-          <p className="text-2xl font-bold text-green-400">((produits || []).length)</p>
+          <p className="text-2xl font-bold text-green-400">{(produits || []).length}</p>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">En rupture (&lt; 5)</p>
