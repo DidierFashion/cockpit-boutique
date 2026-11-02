@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Clock, AlertTriangle, TrendingUp, Zap, Plus, X, Trash2, User, LogIn, LogOut } from 'lucide-react';
+import { db } from '../firebase'; 
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 
 const EMPLOYES_INITIAUX = [
   { id: 1, nom: 'Marie K.', poste: 'Vendeuse', presence: 95, ponctualite: 90, productivite: 85 },
@@ -196,6 +198,7 @@ const FicheEmploye = ({ employe, onFermer, onSupprimer }: any) => {
   );
 };
 const ModuleProduits = ({produits, setProduits }:any) => {
+  console.log("Produits dans lemodule:", produits);
   const CATEGORIES = ['Vêtements', 'Chaussures', 'Accessoires', 'Alimentation', 'Électronique', 'Autre'];
   
   const [recherche, setRecherche] = useState('');
@@ -203,7 +206,8 @@ const ModuleProduits = ({produits, setProduits }:any) => {
   const [formData, setFormData] = useState({
     nom: '',
     categorie: 'Vêtements',
-    prix: 0,
+    prix: 0, 
+    prixAchat:0,
     quantite: 0,
   });
 
@@ -211,29 +215,75 @@ const ModuleProduits = ({produits, setProduits }:any) => {
     p.nom.toLowerCase().includes(recherche.toLowerCase())
   );
 
-  const valeurTotale = (produits || []).reduce((acc: number, p: any) => acc + (p.prix * p.quantite), 0);
+  const valeurTotale = (produits || []).reduce((acc: number, p: any) => acc + (Number(p.prix || 0) * Number(p.quantite || 0)), 0);
+  const margeTotale = (produits || []).reduce((acc: number, p: any) => acc + ((Number(p.prix || 0) - Number(p.prixAchat || 0)) * Number(p.quantite || 0)), 0);
   const produitsEnRupture = (produits || []).filter((p: any) => p.quantite < 5).length;
 
-  const ajouterProduit = () => {
-    if (!formData.nom.trim()) return;
-    setProduits([...produits, {
-      id: Date.now(),
-      ...formData,
-    }]);
-    setFormData({ nom: '', categorie: 'Vêtements', prix: 0, quantite: 0 });
-    setShowForm(false);
+  const ajouterProduit = async () => {
+    if (!formData.nom.trim()) {
+
+      alert("Veuillez entrer un nom de produit.");
+      return;
+    }
+    
+    try {
+      console.log("Tentative d'enregistrement dans Firebase...");
+      await addDoc(collection(db, "produits"), {
+        nom: formData.nom,
+        categorie: formData.categorie,
+        prix: Number(formData.prix),
+        prixAchat: Number(formData.prixAchat),
+        quantite: Number(formData.quantite)
+      });
+      console.log("Produit enregistré avec succès !");
+      
+      // On vide le formulaire et on le ferme
+      setFormData({ nom: '', categorie: 'Vêtements', prix: 0,prixAchat: 0, quantite: 0 });
+      setShowForm(false);
+      
+      alert("Produit ajouté avec succès !"); // Ça va afficher une petite fenêtre
+    } catch (error) {
+      console.error("ERREUR FIREBASE :", error);
+      alert("Erreur lors de l'ajout. Regardez la console.");
+    }
   };
 
-  const supprimerProduit = (id: number) => {
-    setProduits(produits.filter((p: any) => p.id !== id));
+  const supprimerProduit = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "produits", id));
+    } catch (error) {
+      console.error("Erreur lors de la suppression du produit : ", error);
+    }
   };
 
-  const modifierQuantite = (id: number, delta: number) => {
-    setProduits(produits.map((p: any) =>
-      p.id === id ? { ...p, quantite: Math.max(0, p.quantite + delta) } : p
-    ));
+  const modifierQuantite = async (id: string, delta: number) => {
+    try {
+      const produit = produits.find((p: any) => p.id === id);
+      if (produit) {
+        const nouveauStock = Math.max(0, produit.quantite + delta);
+        await updateDoc(doc(db, "produits", id), {
+          quantite: nouveauStock
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors de la modification de la quantité : ", error);
+    }
   };
 
+const reapprovisionnerStock = async (id: string, quantiteAjoutee: number) => {
+    try {
+      const produit = produits.find((p: any) => p.id === id);
+      if (produit) {
+        const nouveauStock = produit.quantite + quantiteAjoutee;
+        await updateDoc(doc(db, "produits", id), {
+          quantite: nouveauStock
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors du réapprovisionnement : ", error);
+    }
+  };
+  
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
       {/* En-tête */}
@@ -253,11 +303,16 @@ const ModuleProduits = ({produits, setProduits }:any) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">Total produits</p>
+          <p style={{ color:'red',fontSize: '20px'}}>TEST AFFICHAGE</p>
           <p className="text-2xl font-bold text-cyan-400">{(produits|| []).length}</p>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">Valeur du stock</p>
-          <p className="text-2xl font-bold text-green-400">{(produits || []).length}</p>
+          <p className="text-2xl font-bold text-green-400">{Number(valeurTotale || 0).toLocaleString('fr-FR')} FCFA</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+          <p className="text-xs text-slate-400 uppercase mb-1">Marge Potentielle</p>
+          <p className="text-2xl font-bold text-green-400">{Number(margeTotale || 0).toLocaleString('fr-FR')} FCFA</p>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">En rupture (&lt; 5)</p>
@@ -296,6 +351,13 @@ const ModuleProduits = ({produits, setProduits }:any) => {
             />
             <input
               type="number"
+              placeholder="Prix d'achat (FCFA)"
+              value={formData.prixAchat || ''}
+              onChange={(e) => setFormData({ ...formData, prixAchat: Number(e.target.value) })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white"
+            />
+            <input
+              type="number"
               placeholder="Quantité"
               value={formData.quantite || ''}
               onChange={(e) => setFormData({ ...formData, quantite: Number(e.target.value) })}
@@ -304,12 +366,7 @@ const ModuleProduits = ({produits, setProduits }:any) => {
           </div>
           <div className="flex gap-2 mt-3">
             <button
-              onClick={() => setShowForm(false)}
-              className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-2 rounded text-sm"
-            >
-              Annuler
-            </button>
-            <button
+              
               onClick={ajouterProduit}
               disabled={!formData.nom.trim()}
               className="flex-1 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold py-2 rounded text-sm"
@@ -382,9 +439,21 @@ const ModuleProduits = ({produits, setProduits }:any) => {
                     className="w-7 h-7 flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-white rounded font-bold"
                   >
                     +
-                  </button>
-                </div>
-
+              </button>
+              <button 
+ onClick={() => {
+              const qte = prompt("Combien de produits ajouter au stock ?");
+              if (qte && !isNaN(Number(qte))) {
+                reapprovisionnerStock(p.id, Number(qte));
+              }
+            }}
+            className="ml-2 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs font-bold"
+            title="Réapprovisionner"
+          >
+            + Stock
+          
+          </button>
+        </div>  
                 <div className="text-right min-w-[100px]">
                   <p className="text-xs text-slate-400">Valeur</p>
                   <p className="text-sm font-bold text-cyan-400">
@@ -410,32 +479,49 @@ const ModuleProduits = ({produits, setProduits }:any) => {
 
 const ModulePointage = ({ employes }: any) => {
   const [heure, setHeure] = useState(new Date());
-  const [pointages, setPointages] = useLocalStorage('cockpit-pointages', [] as any[]);
+  const [pointages, setPointages] = useState<any[]>([]);
   const [employeChoisi, setEmployeChoisi] = useState('');
 
   useEffect(() => {
     const timer = setInterval(() => setHeure(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "pointages"), (snapshot) => {
+      const pointagesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPointages(pointagesData);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const heureStr = heure.toLocaleTimeString('fr-FR');
   const dateStr = heure.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  const pointer = (type: 'in' | 'out') => {
+   const pointer = async (type: 'in' | 'out') => {
     if (!employeChoisi) return;
     const emp = employes.find((e: any) => e.nom === employeChoisi);
     if (!emp) return;
-    const estEnRetard = heure.getHours() > 8 || (heure.getHours() === 8 && heure.getMinutes() > 10);
-    const nouveauPointage = {
-      id: Date.now(),
-      employe: emp.nom,
-      poste: emp.poste,
-      heure: heureStr,
-      type,
-      statut: type === 'in' ? (estEnRetard ? 'Retard' : 'Présent') : 'Parti',
-    };
-    setPointages([nouveauPointage, ...pointages]);
-    setEmployeChoisi('');
+
+    const estEnRetard = heure.getHours() > 8 || (heure.getHours() === 8 && heure.getMinutes() > 0);
+    
+    try {
+      await addDoc(collection(db, "pointages"), {
+        employe: emp.nom,
+        poste: emp.poste,
+        heure: heureStr,
+        date: dateStr, // On ajoute la date, ça servira pour l'historique
+        type: type === 'in' ? 'in': 'out',
+        statut: type === 'in' ? (estEnRetard ? 'Retard' : 'Présent') : 'Parti',
+        timestamp: Date.now()
+      });
+      
+      setEmployeChoisi(''); // On vide le champ après l'enregistrement
+    } catch (error) {
+      console.error("Erreur lors du pointage :", error);
+    }
   };
 
   const pointagesIn = pointages.filter((p: any) => p.type === 'in');
@@ -522,32 +608,45 @@ const ModuleCalendrier = ({ employes }: any) => {
     { nom: 'Nuit', couleur: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
   ];
 
-  const [planning, setPlanning] = useLocalStorage('cockpit-planning', [] as any[]);
+  const [planning, setPlanning] = useState<any[]>([]);
   const [jourChoisi, setJourChoisi] = useState('Lundi');
   const [shiftChoisi, setShiftChoisi] = useState('Matin');
   const [employeChoisi, setEmployeChoisi] = useState('');
 
-  const ajouterAuPlanning = () => {
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "planning"), (snapshot) => {
+      const planningData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPlanning(planningData);
+    });
+    return () => unsubscribe();
+  }, []);
+   const ajouterAuPlanning = async () => {
     if (!employeChoisi) return;
     const emp = employes.find((e: any) => e.nom === employeChoisi);
     if (!emp) return;
+    
     const existeDeja = planning.some((p: any) => p.jour === jourChoisi && p.shift === shiftChoisi && p.employe === emp.nom);
     if (existeDeja) return;
-    setPlanning([...planning, {
-      id: Date.now(),
-      jour: jourChoisi,
-      shift: shiftChoisi,
-      employe: emp.nom,
-      poste: emp.poste,
-    }]);
-    setEmployeChoisi('');
+
+    try {
+      await addDoc(collection(db, "planning"), {
+        jour: jourChoisi,
+        shift: shiftChoisi,
+        employe: emp.nom,
+        poste: emp.poste,
+        timestamp: Date.now()
+      });
+      
+      setEmployeChoisi('');
+    } catch (error) {
+      console.error("Erreur lors de l'ajout au planning :", error);
+    }
   };
 
-  const supprimerCreneau = (id: number) => {
-    setPlanning(planning.filter((p: any) => p.id !== id));
-  };
-
-  const getShiftStyle = (nom: string) => SHIFTS.find(s => s.nom === nom)?.couleur || 'bg-slate-800 text-slate-300';
+const getShiftStyle = (nom: string) => SHIFTS.find(s => s.nom === nom)?.couleur || 'bg-slate-800 text-slate-300';
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
@@ -617,10 +716,34 @@ const ModuleCalendrier = ({ employes }: any) => {
 
 export default function CockpitRH() {
   const [employes, setEmployes] = useLocalStorage('cockpit-employes', EMPLOYES_INITIAUX);
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "employees"), (snapshot) => {
+      const employeesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[]; // On force le type pour TypeScript
+      
+      setEmployes(employeesData);
+    });
+
+    return () => unsubscribe(); // Nettoie l'écouteur quand on quitte la page
+  }, []);
   const [showForm, setShowForm] = useState(false);
   const [employeSelectionne, setEmployeSelectionne] = useState<any>(null);
+  
   const [produits, setProduits] = useLocalStorage('cockpit-produits', [] as any[]);
+useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "produits"), (snapshot) => {
+      const produitsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any;
+  console.log("Produits reçus :", produitsData);  
+      setProduits(produitsData);
+    });
 
+    return () => unsubscribe();
+  }, []);
   const moyenneMotivation = employes.length > 0
     ? Math.round(employes.reduce((acc: number, e: any) => acc + calculerMotivation(e), 0) / employes.length)
     : 0;
@@ -628,8 +751,26 @@ export default function CockpitRH() {
   const retards = employes.filter((e: any) => e.ponctualite < 80 && e.ponctualite >= 60).length;
   const absents = employes.filter((e: any) => e.presence < 60).length;
 
-  const ajouterEmploye = (data: any) => setEmployes([...employes, { id: Date.now(), ...data }]);
-  const supprimerEmploye = (id: number) => setEmployes(employes.filter((e: any) => e.id !== id));
+  const ajouterEmploye = async (data: any) => {
+    try {
+      await addDoc(collection(db, "employees"), {
+        ...data,
+        presence: Number(data.presence),
+        ponctualite: Number(data.ponctualite),
+        productivite: Number(data.productivite)
+      });
+    } catch (error) {
+      console.error("Erreur lors de l'ajout : ", error);
+    }
+  };
+
+  const supprimerEmploye = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "employees", id));
+    } catch (error) {
+      console.error("Erreur lors de la suppression : ", error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0E1A] text-slate-100 p-6">
@@ -653,8 +794,8 @@ export default function CockpitRH() {
       <ModulePointage employes={employes} />
 
       <ModuleFinance />
-      <ModuleVentes produuits={produits} setProduits={setProduits}/>
-      <ModuleProduits produuits={produits} setProduits={setProduits}/>
+      <ModuleVentes produits={produits} setProduits={setProduits}/>
+      <ModuleProduits produits={produits} setProduit={setProduits}/>
       <ModuleCalendrier employes={employes} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -743,9 +884,23 @@ export default function CockpitRH() {
 const ModuleVentes = ({ produits, setProduits }: any) => {
   const [ventes, setVentes] = useLocalStorage('cockpit-ventes', [] as any[]);
   const [produitChoisi, setProduitChoisi] = useState('');
+  const [rechercheProduit, setRechercheProduit] = useState('');
   const [quantiteVente, setQuantiteVente] = useState(1);
   const [message, setMessage] = useState('');
+   useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "ventes"), (snapshot) => {
+      const ventesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any;
+      setVentes(ventesData);
+    });
+    return () => unsubscribe();
+  }, []);
 
+  const produitsFiltresVente = (produits || []).filter((p: any) => 
+     p.nom.toLowerCase().includes(rechercheProduit.toLowerCase()) && p.quantite > 0
+   );
   const venteDuJour = () => {
     const aujourdHui = new Date().toLocaleDateString('fr-FR');
     return ventes.filter((v: any) => v.date === aujourdHui);
@@ -761,39 +916,54 @@ const ModuleVentes = ({ produits, setProduits }: any) => {
   const nbVentesJour = venteDuJour().length;
   const panierMoyen = nbVentesJour > 0 ? Math.round(caDuJour / nbVentesJour) : 0;
 
-  const enregistrerVente = () => {
+  const enregistrerVente = async () => {
     if (!produitChoisi) return;
     const produit = produits.find((p: any) => p.nom === produitChoisi);
     if (!produit) return;
+    
     if (quantiteVente > produit.quantite) {
       setMessage(`❌ Stock insuffisant (${produit.quantite} disponible)`);
       setTimeout(() => setMessage(''), 3000);
       return;
     }
-    const maintenant = new Date();
-    const dateStr = maintenant.toLocaleDateString('fr-FR');
-    const moisStr = maintenant.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-    const heureStr = maintenant.toLocaleTimeString('fr-FR').substring(0, 5);
-    const total = produit.prix * quantiteVente;
-    const nouvelleVente = {
-      id: Date.now(),
-      date: dateStr,
-      mois: moisStr,
-      heure: heureStr,
-      produit: produit.nom,
-      categorie: produit.categorie,
-      quantite: quantiteVente,
-      prixUnitaire: produit.prix,
-      total,
-    };
-    setVentes([nouvelleVente, ...ventes]);
-    setProduits(produits.map((p: any) =>
-      p.nom === produitChoisi ? { ...p, quantite: p.quantite - quantiteVente } : p
-    ));
-    setMessage(`✅ Vente : ${produit.nom} × ${quantiteVente} = ${total.toLocaleString('fr-FR')} FCFA`);
-    setTimeout(() => setMessage(''), 3000);
-    setProduitChoisi('');
-    setQuantiteVente(1);
+
+    try {
+      // 1. Enregistrer la vente dans une nouvelle collection "ventes"
+      const maintenant = new Date();
+      const dateStr = maintenant.toLocaleDateString('fr-FR');
+      const moisStr = maintenant.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+      const heureStr = maintenant.toLocaleTimeString('fr-FR').substring(0, 5);
+      const total = produit.prix * quantiteVente;
+      
+      await addDoc(collection(db, "ventes"), {
+        produitNom: produit.nom,
+        quantite: Number(quantiteVente),
+        prixUnitaire: Number(produit.prix),
+        total: Number(total),
+        date: dateStr,
+        mois: moisStr,
+        heure: heureStr,
+        timestamp: maintenant.getTime()
+      });
+
+      // 2. Mettre à jour le stock du produit dans Firebase
+      const nouveauStock = produit.quantite - quantiteVente;
+      await updateDoc(doc(db, "produits", produit.id), {
+        quantite: nouveauStock
+      });
+
+      // 3. Afficher le succès et réinitialiser
+      setMessage(`✅ Vente de ${quantiteVente} ${produit.nom} enregistrée !`);
+      setQuantiteVente(1); // On remet la quant
+      setProduitChoisi('');
+      setRechercheProduit('');
+      setTimeout(() => setMessage(''), 3000);
+
+    } catch (error) {
+      console.error("Erreur lors de la vente : ", error);
+      setMessage("❌ Erreur lors de l'enregistrement de la vente.");
+      setTimeout(() => setMessage(''), 3000);
+    }
   };
 
   const supprimerVente = (id: number) => {
@@ -805,9 +975,9 @@ const ModuleVentes = ({ produits, setProduits }: any) => {
   const topProduits = () => {
     const compteur: any = {};
     ventes.forEach((v: any) => {
-      if (!compteur[v.produit]) compteur[v.produit] = { qte: 0, ca: 0 };
-      compteur[v.produit].qte += v.quantite;
-      compteur[v.produit].ca += v.total;
+      if (!compteur[v.produitNom]) compteur[v.produitNom] = { qte: 0, ca: 0 };
+      compteur[v.produitNom].qte += v.quantite;
+      compteur[v.produitNom].ca += v.total;
     });
     return Object.entries(compteur)
       .map(([nom, data]: any) => ({ nom, ...data }))
@@ -852,16 +1022,44 @@ const ModuleVentes = ({ produits, setProduits }: any) => {
       <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-4 mb-6">
         <h3 className="text-xs uppercase tracking-wider text-slate-400 mb-3">🛒 Nouvelle vente</h3>
         <div className="flex flex-col md:flex-row gap-3">
-          <select value={produitChoisi} onChange={(e) => setProduitChoisi(e.target.value)}
-            className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-3 text-white">
-            <option value="">— Sélectionner un produit —</option>
-            {produitsDisponibles.map((p: any) => (
-              <option key={p.id} value={p.nom}>
-                {p.nom} — {p.prix.toLocaleString('fr-FR')} FCFA ({p.quantite} en stock)
-              </option>
-            ))}
-          </select>
-          <input type="number" min="1" value={quantiteVente}
+    <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="Tapez le nom du produit..."
+            value={rechercheProduit}
+            onChange={(e) => {
+              setRechercheProduit(e.target.value);
+              setProduitChoisi(''); 
+            }}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white"
+          />
+          
+          {rechercheProduit && !produitChoisi && (
+            <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded shadow-lg max-h-48 overflow-y-auto">
+              {produitsFiltresVente.length === 0 ? (
+                <div className="p-3 text-slate-400 text-sm">Aucun produit trouvé.</div>
+              ) : (
+                produitsFiltresVente.map((p: any) => (
+                  <div
+                    key={p.id}
+                    onClick={() => {
+                      setProduitChoisi(p.nom);
+                      setRechercheProduit(p.nom);
+                    }}
+                    className="p-3 hover:bg-slate-700 cursor-pointer text-sm border-b border-slate-700 last:border-0"
+                  >
+                    <span className="font-bold text-white">{p.nom}</span>
+                    <span className="text-slate-400 ml-2">({p.quantite} en stock)</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+  
+</div>  
+        <div className="flex flex-col md:flex-row gap-3">
+          <input key={'quantite-${quantiteVente}'} type="number" min="1" value={quantiteVente || ''}
             onChange={(e) => setQuantiteVente(Math.max(1, Number(e.target.value)))}
             className="w-full md:w-24 bg-slate-800 border border-slate-700 rounded px-3 py-3 text-white text-center" />
           <button onClick={enregistrerVente} disabled={!produitChoisi}
@@ -926,10 +1124,32 @@ const ModuleVentes = ({ produits, setProduits }: any) => {
   );
 };
 const ModuleFinance = () => {
-  const [depenses, setDepenses] = useLocalStorage('cockpit-depenses', [] as any[]);
-  const [ventes] = useLocalStorage('cockpit-ventes', [] as any[]);
+  const [depenses, setDepenses] = useState<any[]>([]);
+  const [ventes, setVentes] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ description: '', categorie: 'Loyer', montant: 0 });
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "depenses"), (snapshot) => {
+      const depensesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setDepenses(depensesData);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "ventes"), (snapshot) => {
+      const ventesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setVentes(ventesData);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const CATEGORIES_DEPENSES = ['Loyer', 'Électricité', 'Eau', 'Salaires', 'Transport', 'Fournisseurs', 'Autre'];
 
@@ -941,28 +1161,47 @@ const ModuleFinance = () => {
   const caMois = ventes.filter((v: any) => v.mois === moisActuel).reduce((acc: number, v: any) => acc + v.total, 0);
 
   // Calculs Dépenses
-  const depensesJour = depenses.filter((d: any) => d.date === aujourdHui).reduce((acc: number, d: any) => acc + d.montant, 0);
-  const depensesMois = depenses.filter((d: any) => d.mois === moisActuel).reduce((acc: number, d: any) => acc + d.montant, 0);
+  const depensesJour = depenses
+    .filter((d: any) => d && d.date === aujourdHui)
+    .reduce((acc: number, d: any) => acc + Number(d.montant), 0);
+
+  const depensesMois = depenses
+    .filter((d: any) => d && d.mois === moisActuel)
+    .reduce((acc: number, d: any) => acc + Number(d.montant), 0);
 
   // Bénéfice Net
   const beneficeJour = caJour - depensesJour;
   const beneficeMois = caMois - depensesMois;
 
-  const ajouterDepense = () => {
+  const ajouterDepense = async () => {
     if (!formData.description.trim() || formData.montant <= 0) return;
+    
     const maintenant = new Date();
-    const nouvelleDepense = {
-      id: Date.now(),
-      date: maintenant.toLocaleDateString('fr-FR'),
-      mois: maintenant.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-      ...formData,
-    };
-    setDepenses([nouvelleDepense, ...depenses]);
-    setFormData({ description: '', categorie: 'Loyer', montant: 0 });
-    setShowForm(false);
+    
+    try {
+      await addDoc(collection(db, "depenses"), {
+        description: formData.description,
+        categorie: formData.categorie,
+        montant: Number(formData.montant),
+        date: maintenant.toLocaleDateString('fr-FR'),
+        mois: maintenant.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+        timestamp: maintenant.getTime()
+      });
+      
+      setFormData({ description: '', categorie: 'Loyer', montant: 0 });
+      setShowForm(false);
+    } catch (error) {
+      console.error("Erreur lors de l'ajout de la dépense :", error);
+    }
   };
 
-  const supprimerDepense = (id: number) => setDepenses(depenses.filter((d: any) => d.id !== id));
+  const supprimerDepense = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "depenses", id));
+    } catch (error) {
+      console.error("Erreur lors de la suppression de la dépense :", error);
+    }
+  };
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
