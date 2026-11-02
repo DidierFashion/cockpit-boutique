@@ -197,7 +197,7 @@ const FicheEmploye = ({ employe, onFermer, onSupprimer }: any) => {
     </div>
   );
 };
-const ModuleProduits = ({produits, setProduits }:any) => {
+const ModuleProduits = ({produits}:any) => {
   console.log("Produits dans lemodule:", produits);
   const CATEGORIES = ['Vêtements', 'Chaussures', 'Accessoires', 'Alimentation', 'Électronique', 'Autre'];
   
@@ -645,6 +645,13 @@ const ModuleCalendrier = ({ employes }: any) => {
       console.error("Erreur lors de l'ajout au planning :", error);
     }
   };
+const supprimerCreneau = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "planning", id));
+    } catch (error) {
+      console.error("Erreur lors de la suppression du créneau :", error);
+    }
+  };
 
 const getShiftStyle = (nom: string) => SHIFTS.find(s => s.nom === nom)?.couleur || 'bg-slate-800 text-slate-300';
 
@@ -731,18 +738,8 @@ export default function CockpitRH() {
   const [showForm, setShowForm] = useState(false);
   const [employeSelectionne, setEmployeSelectionne] = useState<any>(null);
   
-  const [produits, setProduits] = useLocalStorage('cockpit-produits', [] as any[]);
-useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "produits"), (snapshot) => {
-      const produitsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as any; 
-      setProduits(produitsData);
-    });
+  const [produits] = useState<any[]>([]);
 
-    return () => unsubscribe();
-  }, []);
   const moyenneMotivation = employes.length > 0
     ? Math.round(employes.reduce((acc: number, e: any) => acc + calculerMotivation(e), 0) / employes.length)
     : 0;
@@ -794,7 +791,7 @@ useEffect(() => {
 
       <ModuleFinance />
       <ModuleVentes produits={produits}/>
-      <ModuleProduits produits={produits} setProduit={setProduits}/>
+      <ModuleProduits produits={produits}/>
       <ModuleCalendrier employes={employes} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -880,7 +877,7 @@ useEffect(() => {
     </div>
   );
 }
-const ModuleVentes = ({ produits, setProduits }: any) => {
+const ModuleVentes = ({ produits }: any) => {
   const [ventes, setVentes] = useState<any[]>([]);
   const [produitChoisi, setProduitChoisi] = useState('');
   const [rechercheProduit, setRechercheProduit] = useState('');
@@ -968,8 +965,6 @@ const ModuleVentes = ({ produits, setProduits }: any) => {
   const supprimerVente = (id: number) => {
     setVentes(ventes.filter((v: any) => v.id !== id));
   };
-
- const produitsDisponibles = (produits || []).filter((p: any) => p.quantite > 0);
 
   const topProduits = () => {
     const compteur: any = {};
