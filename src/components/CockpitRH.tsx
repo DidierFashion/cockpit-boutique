@@ -737,8 +737,7 @@ useEffect(() => {
       const produitsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })) as any;
-  console.log("Produits reçus :", produitsData);  
+      })) as any; 
       setProduits(produitsData);
     });
 
@@ -794,7 +793,7 @@ useEffect(() => {
       <ModulePointage employes={employes} />
 
       <ModuleFinance />
-      <ModuleVentes produits={produits} setProduits={setProduits}/>
+      <ModuleVentes produits={produits}/>
       <ModuleProduits produits={produits} setProduit={setProduits}/>
       <ModuleCalendrier employes={employes} />
 
@@ -882,7 +881,7 @@ useEffect(() => {
   );
 }
 const ModuleVentes = ({ produits, setProduits }: any) => {
-  const [ventes, setVentes] = useLocalStorage('cockpit-ventes', [] as any[]);
+  const [ventes, setVentes] = useState<any[]>([]);
   const [produitChoisi, setProduitChoisi] = useState('');
   const [rechercheProduit, setRechercheProduit] = useState('');
   const [quantiteVente, setQuantiteVente] = useState(1);
