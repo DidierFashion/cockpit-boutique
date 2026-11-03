@@ -197,8 +197,7 @@ const FicheEmploye = ({ employe, onFermer, onSupprimer }: any) => {
     </div>
   );
 };
-const ModuleProduits = ({produits}:any) => {
-  console.log("Produits dans lemodule:", produits);
+const ModuleProduits = ({produits, estAdmin }:any) => {
   const CATEGORIES = ['Vêtements', 'Chaussures', 'Accessoires', 'Alimentation', 'Électronique', 'Autre'];
   
   const [recherche, setRecherche] = useState('');
@@ -442,11 +441,24 @@ const reapprovisionnerStock = async (id: string, quantiteAjoutee: number) => {
               </button>
               <button 
  onClick={() => {
-              const qte = prompt("Combien de produits ajouter au stock ?");
-              if (qte && !isNaN(Number(qte))) {
-                reapprovisionnerStock(p.id, Number(qte));
-              }
-            }}
+                  if (estAdmin) {
+                    const qte = prompt("Combien de produits ajouter au stock ?");
+                    if (qte && !isNaN(Number(qte))) {
+                      reapprovisionnerStock(p.id, Number(qte));
+                    }
+                  } else {
+                    const mdp = prompt("Entrez le mot de passe Patron pour modifier le stock :");
+                    if (mdp === "admin123") {
+                      const qte = prompt("Combien de produits ajouter au stock ?");
+                      if (qte && !isNaN(Number(qte))) {
+                        reapprovisionnerStock(p.id, Number(qte));
+                      }
+                    } else {
+                      alert("Action non autorisée !");
+                    }
+                  }
+                }}
+
             className="ml-2 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs font-bold"
             title="Réapprovisionner"
           >
@@ -462,9 +474,18 @@ const reapprovisionnerStock = async (id: string, quantiteAjoutee: number) => {
                 </div>
 
                 <button
-                  onClick={() => supprimerProduit(p.id)}
-                  className="text-red-400 hover:text-red-300 p-2"
-                  title="Supprimer"
+                  onClick={() => {
+                  if (estAdmin) {
+                    supprimerProduit(p.id);
+                  } else {
+                    const mdp = prompt("Entrez le mot de passe Patron pour supprimer :");
+                    if (mdp === "admin123") {
+                      supprimerProduit(p.id);
+                    } else {
+                      alert("Action non autorisée !");
+                    }
+                  }
+                }}
                 >
                   <Trash2 size={16} />
                 </button>
@@ -737,7 +758,8 @@ export default function CockpitRH() {
   }, []);
   const [showForm, setShowForm] = useState(false);
   const [employeSelectionne, setEmployeSelectionne] = useState<any>(null);
-  
+  const [estAdmin, setEstAdmin] = useState(false);
+ 
   const [produits] = useState<any[]>([]);
 
   const moyenneMotivation = employes.length > 0
@@ -767,6 +789,14 @@ export default function CockpitRH() {
       console.error("Erreur lors de la suppression : ", error);
     }
   };
+const handleLogin = () => {
+    const motDePasse = prompt("Entrez le mot de passe Patron :");
+    if (motDePasse === "admin123") { // Tu pourras changer ce mot de passe plus tard
+      setEstAdmin(true);
+        } else if (motDePasse !== null) {
+      alert("Mot de passe incorrect !");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0E1A] text-slate-100 p-6">
@@ -780,18 +810,33 @@ export default function CockpitRH() {
             <div className="text-xs text-slate-500">Tableau de bord en direct</div>
             <div className="text-sm font-mono text-cyan-400">● EN LIGNE</div>
           </div>
-          <button onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold px-4 py-2 rounded-lg">
-            <Plus size={18} /> Nouvel employé
+            {!estAdmin && (
+          <button 
+            onClick={handleLogin}
+            className="px-4 py-2 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 text-sm font-medium border border-slate-700"
+          >
+            🔒 Mode Patron
           </button>
+        )}
+        
+        {estAdmin && (
+          <span className="text-green-400 text-sm font-bold flex items-center gap-1">
+            🔓 Admin Connecté
+          </span>
+        )}
+
+        <button onClick={() => setShowForm(true)}
+          className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 px-4 py-2 rounded font-bold">
+          <Plus size={18} /> Nouvel employé
+        </button>
         </div>
       </div>
 
       <ModulePointage employes={employes} />
 
-      <ModuleFinance />
+      {estAdmin && <ModuleFinance />}
       <ModuleVentes produits={produits}/>
-      <ModuleProduits produits={produits}/>
+      <ModuleProduits produits={produits} estAdmin={estAdmin} />
       <ModuleCalendrier employes={employes} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
