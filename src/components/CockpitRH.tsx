@@ -302,7 +302,7 @@ const reapprovisionnerStock = async (id: string, quantiteAjoutee: number) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">Total produits</p>
-          <p style={{ color:'red',fontSize: '20px'}}>TEST AFFICHAGE</p>
+          <p style={{ color:'red',fontSize: '20px'}}></p>
           <p className="text-2xl font-bold text-cyan-400">{(produits|| []).length}</p>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
@@ -766,6 +766,10 @@ export default function CockpitRH() {
   const [showForm, setShowForm] = useState(false);
   const [employeSelectionne, setEmployeSelectionne] = useState<any>(null);
   const [estAdmin, setEstAdmin] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [emailLogin, setEmailLogin] = useState('');
+  const [passwordLogin, setPasswordLogin] = useState('');
+  const [loginError, setLoginError] = useState('');
  
   const [produits] = useState<any[]>([]);
   const [ventes, setVentes] = useState<any[]>([]);
@@ -788,20 +792,20 @@ export default function CockpitRH() {
     });
     return () => unsubscribe();
   }, []);
-  const handleLogin = async () => {
-    const email = prompt("Entrez votre adresse email :");
-    if (!email) return;
+  
+    const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault(); // Empêche la page de se recharger
+    setLoginError('');
     
-    const password = prompt("Entrez votre mot de passe :");
-    if (!password) return;
-
     try {
       const auth = getAuth();
-      await signInWithEmailAndPassword(auth, email, password);
-      setEstAdmin(true); // Si la connexion réussit, on passe en mode Admin
+      await signInWithEmailAndPassword(auth, emailLogin, passwordLogin);
+      setEstAdmin(true);
+      setShowLogin(false); // On ferme la fenêtre
+      setEmailLogin('');
+      setPasswordLogin('');
     } catch (error) {
-      alert("Erreur de connexion : email ou mot de passe incorrect.");
-      console.error(error);
+      setLoginError("Email ou mot de passe incorrect.");
     }
   };
 
@@ -832,6 +836,63 @@ export default function CockpitRH() {
       console.error("Erreur lors de la suppression : ", error);
     }
   };
+   if (showLogin) {
+    return (
+      <div className="min-h-screen bg-[#0A0E1A] flex items-center justify-center p-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 w-full max-w-md shadow-2xl">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-white mb-2">🔒 Accès Patron</h2>
+            <p className="text-slate-400 text-sm">Entrez vos identifiants pour déverrouiller la Finance.</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Adresse Email</label>
+              <input 
+                type="email" 
+                value={emailLogin}
+                onChange={(e) => setEmailLogin(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                placeholder="didier@exemple.com"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Mot de passe</label>
+              <input 
+                type="password" 
+                value={passwordLogin}
+                onChange={(e) => setPasswordLogin(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            {loginError && (
+              <p className="text-red-400 text-sm text-center bg-red-500/10 py-2 rounded">{loginError}</p>
+            )}
+
+            <button 
+              type="submit"
+              className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold py-2 px-4 rounded-lg transition-colors mt-4"
+            >
+              Se connecter
+            </button>
+            
+            <button 
+              type="button"
+              onClick={() => setShowLogin(false)}
+              className="w-full text-slate-400 hover:text-white text-sm mt-2"
+            >
+              Annuler
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0E1A] text-slate-100 p-6">
@@ -847,7 +908,7 @@ export default function CockpitRH() {
           </div>
             {!estAdmin && (
           <button 
-            onClick={handleLogin}
+            onClick={() => setShowLogin(true)}
             className="px-4 py-2 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 text-sm font-medium border border-slate-700"
           >
             🔒 Mode Patron
