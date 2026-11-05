@@ -199,7 +199,7 @@ const FicheEmploye = ({ employe, onFermer, onSupprimer }: any) => {
     </div>
   );
 };
-const ModuleProduits = ({produits, estAdmin, setProduits }:any) => {
+const ModuleProduits = ({produits, estAdmin, }:any) => {
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "produits"), (snapshot) => {
       const produitsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
