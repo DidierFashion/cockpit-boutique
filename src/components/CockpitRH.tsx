@@ -214,10 +214,8 @@ const ModuleProduits = ({produits, estAdmin }:any) => {
     p.nom.toLowerCase().includes(recherche.toLowerCase())
   );
 
-  const valeurTotale = (produits || []).reduce((acc: number, p: any) => acc + (Number(p.prix || 0) * Number(p.quantite || 0)), 0);
-  const margeTotale = (produits || []).reduce((acc: number, p: any) => acc + ((Number(p.prix || 0) - Number(p.prixAchat || 0)) * Number(p.quantite || 0)), 0);
   const produitsEnRupture = (produits || []).filter((p: any) => p.quantite < 5).length;
-
+ 
   const ajouterProduit = async () => {
     if (!formData.nom.trim()) {
 
@@ -306,19 +304,26 @@ const reapprovisionnerStock = async (id: string, quantiteAjoutee: number) => {
           <p className="text-2xl font-bold text-cyan-400">{(produits|| []).length}</p>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-          <p className="text-xs text-slate-400 uppercase mb-1">Valeur du stock</p>
-          <p className="text-2xl font-bold text-green-400">{Number(valeurTotale || 0).toLocaleString('fr-FR')} FCFA</p>
-        </div>
-        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-          <p className="text-xs text-slate-400 uppercase mb-1">Marge Potentielle</p>
-          <p className="text-2xl font-bold text-green-400">{Number(margeTotale || 0).toLocaleString('fr-FR')} FCFA</p>
-        </div>
-        <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-          <p className="text-xs text-slate-400 uppercase mb-1">En rupture (&lt; 5)</p>
-          <p className={`text-2xl font-bold ${produitsEnRupture > 0 ? 'text-red-400' : 'text-slate-400'}`}>
-            {produitsEnRupture}
-          </p>
-        </div>
+        <p className="text-xs text-slate-400 uppercase mb-1">Valeur du stock</p>
+        <p className="text-2xl font-bold text-green-400">
+          {produits.reduce((acc: number, p: any) => acc + (Number(p.prix) * Number(p.quantite)), 0).toLocaleString('fr-FR')} FCFA
+        </p>
+      </div>
+
+      <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+        <p className="text-xs text-slate-400 uppercase mb-1">Marge Potentielle</p>
+        <p className="text-2xl font-bold text-green-400">
+          {produits.reduce((acc: number, p: any) => acc + ((Number(p.prix) - Number(p.prixAchat)) * Number(p.quantite)), 0).toLocaleString('fr-FR')} FCFA
+        </p>
+      </div>
+
+      <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+        <p className="text-xs text-slate-400 uppercase mb-1">En rupture (&lt; 5)</p>
+        <p className={`text-2xl font-bold ${produitsEnRupture > 0 ? 'text-red-400' : 'text-slate-400'}`}>
+          {produits ? produits.filter((p: any) => Number(p.quantite) < 5).length : 0}
+        </p>
+      </div>
+
       </div>
 
       {/* Formulaire */}
@@ -760,7 +765,17 @@ export default function CockpitRH() {
   const [employeSelectionne, setEmployeSelectionne] = useState<any>(null);
   const [estAdmin, setEstAdmin] = useState(false);
  
-  const [produits] = useState<any[]>([]);
+  const [produits, setProduits] = useState<any[]>([]);
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "produits"), (snapshot) => {
+      const produitsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setProduits(produitsData);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const moyenneMotivation = employes.length > 0
     ? Math.round(employes.reduce((acc: number, e: any) => acc + calculerMotivation(e), 0) / employes.length)
@@ -940,7 +955,7 @@ const ModuleVentes = ({ produits }: any) => {
   }, []);
 
   const produitsFiltresVente = (produits || []).filter((p: any) => 
-     p.nom.toLowerCase().includes(rechercheProduit.toLowerCase()) && p.quantite > 0
+     p.nom.toLowerCase().includes(rechercheProduit.toLowerCase())
    );
   const venteDuJour = () => {
     const aujourdHui = new Date().toLocaleDateString('fr-FR');
