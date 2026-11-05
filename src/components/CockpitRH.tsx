@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Clock, AlertTriangle, TrendingUp, Zap, Plus, X, Trash2, User, LogIn, LogOut } from 'lucide-react';
 import { db } from '../firebase'; 
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 
 const EMPLOYES_INITIAUX = [
   { id: 1, nom: 'Marie K.', poste: 'Vendeuse', presence: 95, ponctualite: 90, productivite: 85 },
@@ -765,17 +766,23 @@ export default function CockpitRH() {
   const [employeSelectionne, setEmployeSelectionne] = useState<any>(null);
   const [estAdmin, setEstAdmin] = useState(false);
  
-  const [produits, setProduits] = useState<any[]>([]);
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "produits"), (snapshot) => {
-      const produitsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setProduits(produitsData);
-    });
-    return () => unsubscribe();
-  }, []);
+  const [produits] = useState<any[]>([]);
+  const handleLogin = async () => {
+    const email = prompt("Entrez votre adresse email :");
+    if (!email) return;
+    
+    const password = prompt("Entrez votre mot de passe :");
+    if (!password) return;
+
+    try {
+      const auth = getAuth();
+      await signInWithEmailAndPassword(auth, email, password);
+      setEstAdmin(true); // Si la connexion réussit, on passe en mode Admin
+    } catch (error) {
+      alert("Erreur de connexion : email ou mot de passe incorrect.");
+      console.error(error);
+    }
+  };
 
   const moyenneMotivation = employes.length > 0
     ? Math.round(employes.reduce((acc: number, e: any) => acc + calculerMotivation(e), 0) / employes.length)
@@ -802,14 +809,6 @@ export default function CockpitRH() {
       await deleteDoc(doc(db, "employees", id));
     } catch (error) {
       console.error("Erreur lors de la suppression : ", error);
-    }
-  };
-const handleLogin = () => {
-    const motDePasse = prompt("Entrez le mot de passe Patron :");
-    if (motDePasse === "admin123") { // Tu pourras changer ce mot de passe plus tard
-      setEstAdmin(true);
-        } else if (motDePasse !== null) {
-      alert("Mot de passe incorrect !");
     }
   };
 
