@@ -930,8 +930,8 @@ export default function CockpitRH() {
 
       <ModulePointage employes={employes} />
 
-      {estAdmin && <ModuleFinance />}
       {estAdmin && <ModuleGraphiques ventes={ventes} depenses={depenses} />}
+       {estAdmin && <ModuleFinance ventes={ventes} depenses={depenses} />}
       <ModuleVentes produits={produits}/>
       <ModuleProduits produits={produits} estAdmin={estAdmin} />
       <ModuleCalendrier employes={employes} />
@@ -1259,33 +1259,10 @@ const ModuleVentes = ({ produits }: any) => {
     </div>
   );
 };
-const ModuleFinance = () => {
-  const [depenses, setDepenses] = useState<any[]>([]);
-  const [ventes, setVentes] = useState<any[]>([]);
+  
+  const ModuleFinance = ({ventes, depenses }: any) => {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ description: '', categorie: 'Loyer', montant: 0 });
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "depenses"), (snapshot) => {
-      const depensesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setDepenses(depensesData);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "ventes"), (snapshot) => {
-      const ventesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setVentes(ventesData);
-    });
-    return () => unsubscribe();
-  }, []);
 
   const CATEGORIES_DEPENSES = ['Loyer', 'Électricité', 'Eau', 'Salaires', 'Transport', 'Fournisseurs', 'Autre'];
 
