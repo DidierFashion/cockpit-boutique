@@ -3,6 +3,7 @@ import { Users, Clock, AlertTriangle, TrendingUp, Zap, Plus, X, Trash2, User, Lo
 import { db } from '../firebase'; 
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import ModuleGraphiques from './ModuleGraphiques'; 
 
 const EMPLOYES_INITIAUX = [
   { id: 1, nom: 'Marie K.', poste: 'Vendeuse', presence: 95, ponctualite: 90, productivite: 85 },
@@ -767,6 +768,26 @@ export default function CockpitRH() {
   const [estAdmin, setEstAdmin] = useState(false);
  
   const [produits] = useState<any[]>([]);
+  const [ventes, setVentes] = useState<any[]>([]);
+  const [depenses, setDepenses] = useState<any[]>([]);
+
+  // Écouter les ventes pour les graphiques
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "ventes"), (snapshot) => {
+      const ventesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setVentes(ventesData);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Écouter les dépenses pour les graphiques
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "depenses"), (snapshot) => {
+      const depensesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setDepenses(depensesData);
+    });
+    return () => unsubscribe();
+  }, []);
   const handleLogin = async () => {
     const email = prompt("Entrez votre adresse email :");
     if (!email) return;
@@ -849,6 +870,7 @@ export default function CockpitRH() {
       <ModulePointage employes={employes} />
 
       {estAdmin && <ModuleFinance />}
+      {estAdmin && <ModuleGraphiques ventes={ventes} depenses={depenses} />}
       <ModuleVentes produits={produits}/>
       <ModuleProduits produits={produits} estAdmin={estAdmin} />
       <ModuleCalendrier employes={employes} />
