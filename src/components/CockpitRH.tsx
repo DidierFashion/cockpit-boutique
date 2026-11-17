@@ -200,13 +200,7 @@ const FicheEmploye = ({ employe, onFermer, onSupprimer }: any) => {
   );
 };
 const ModuleProduits = ({produits, estAdmin, }:any) => {
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "produits"), (snapshot) => {
-      const produitsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setProduits(produitsData);
-    });
-    return () => unsubscribe();
-  }, []);
+  
   const CATEGORIES = ['Vêtements', 'Chaussures', 'Accessoires', 'Alimentation', 'Électronique', 'Autre'];
   
   const [recherche, setRecherche] = useState('');
@@ -778,7 +772,19 @@ export default function CockpitRH() {
   const [passwordLogin, setPasswordLogin] = useState('');
   const [loginError, setLoginError] = useState('');
  
-  const [produits] = useState<any[]>([]);
+  const [produits, setProduits] = useState<any[]>([]);
+
+// Écouter les produits depuis Firebase
+useEffect(() => {
+  const unsubscribe = onSnapshot(collection(db, "produits"), (snapshot) => {
+    const produitsData = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    setProduits(produitsData);
+  });
+  return () => unsubscribe();
+}, []);
   const [ventes, setVentes] = useState<any[]>([]);
   const [depenses, setDepenses] = useState<any[]>([]);
 
