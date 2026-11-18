@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Clock, AlertTriangle, TrendingUp, Zap, Plus, X, Trash2, User, LogIn, LogOut } from 'lucide-react';
 import { db } from '../firebase'; 
-import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updatedDoc, setDoc } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import ModuleGraphiques from './ModuleGraphiques'; 
 
@@ -199,7 +199,7 @@ const FicheEmploye = ({ employe, onFermer, onSupprimer }: any) => {
     </div>
   );
 };
-const ModuleProduits = ({produits, estAdmin, }:any) => {
+const ModuleProduits = ({produits, estAdmin, mdpPatron }:any) => {
   
   const CATEGORIES = ['Vêtements', 'Chaussures', 'Accessoires', 'Alimentation', 'Électronique', 'Autre'];
   
@@ -456,7 +456,7 @@ const reapprovisionnerStock = async (id: string, quantiteAjoutee: number) => {
                     }
                   } else {
                     const mdp = prompt("Entrez le mot de passe Patron pour modifier le stock :");
-                    if (mdp === "admin123") {
+                    if (mdp === mdpPatron) {
                       const qte = prompt("Combien de produits ajouter au stock ?");
                       if (qte && !isNaN(Number(qte))) {
                         reapprovisionnerStock(p.id, Number(qte));
@@ -785,6 +785,19 @@ useEffect(() => {
   });
   return () => unsubscribe();
 }, []);
+const [mdpPatron, setMdpPatron] = useState("admin123");
+
+// Charger le mot de passe Patron depuis Firebase
+useEffect(() => {
+  const unsub = onSnapshot(doc(db, "parametres", "admin"), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data() as any;
+      if (data.motDePasse) setMdpPatron(data.motDePasse);
+    }
+  });
+  return () => unsub();
+}, []);
+
   const [ventes, setVentes] = useState<any[]>([]);
   const [depenses, setDepenses] = useState<any[]>([]);
 
@@ -821,6 +834,25 @@ useEffect(() => {
       setLoginError("Email ou mot de passe incorrect.");
     }
   };
+  const changerMotDePasse = async () => {
+  const nouveau = prompt("Nouveau mot de passe Patron (min 4 caractères) :");
+  if (!nouveau || nouveau.trim().length < 4) {
+    alert("Mot de passe trop court (min 4 caractères).");
+    return;
+  }
+  const confirmation = prompt("Confirme le nouveau mot de passe :");
+  if (nouveau.trim() !== confirmation) {
+    alert("Les deux mots de passe ne correspondent pas.");
+    return;
+  }
+  try {
+    await setDoc(doc(db, "parametres", "admin"), { motDePasse: nouveau.trim() });
+    alert("Mot de passe mis à jour avec succès !");
+  } catch (error) {
+    console.error("Erreur :", error);
+    alert("Erreur lors de la mise à jour.");
+  }
+};
 
   const moyenneMotivation = employes.length > 0
     ? Math.round(employes.reduce((acc: number, e: any) => acc + calculerMotivation(e), 0) / employes.length)
@@ -929,10 +961,16 @@ useEffect(() => {
         )}
         
         {estAdmin && (
-          <span className="text-green-400 text-sm font-bold flex items-center gap-1">
-            🔓 Admin Connecté
-          </span>
-        )}
+  <div className="flex items-center gap-2">
+    <span className="text-green-400 text-sm font-bold flex items-center gap-1">
+      🔓 Admin Connecté
+    </span>
+    <button onClick={changerMotDePasse}
+      className="px-4 py-2 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 text-sm font-medium border border-slate-700">
+      🔑 Changer MDP
+    </button>
+  </div>
+)}
 
         <button onClick={() => setShowForm(true)}
           className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 px-4 py-2 rounded font-bold">
@@ -946,7 +984,7 @@ useEffect(() => {
       {estAdmin && <ModuleGraphiques ventes={ventes} depenses={depenses} />}
        {estAdmin && <ModuleFinance ventes={ventes} depenses={depenses} />}
       <ModuleVentes produits={produits}/>
-      <ModuleProduits produits={produits} estAdmin={estAdmin} />
+      <ModuleProduits produits={produits} estAdmin={estAdmin} mdpPatron={mdpPatron} />
       <ModuleCalendrier employes={employes} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -1117,9 +1155,13 @@ const ModuleVentes = ({ produits }: any) => {
     }
   };
 
-  const supprimerVente = (id: number) => {
-    setVentes(ventes.filter((v: any) => v.id !== id));
-  };
+  const supprimerVente = async (id: string) => {
+  try {
+    await deleteDoc(doc(db, "ventes", id));
+  } catch (error) {
+    console.error("Erreur lors de la suppression de la vente :", error);
+  }
+};
 
   const topProduits = () => {
     const compteur: any = {};
@@ -1237,7 +1279,7 @@ const ModuleVentes = ({ produits }: any) => {
                 <div key={v.id} className="flex items-center justify-between gap-2 bg-slate-800/50 rounded-lg p-2 text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-slate-500 font-mono">{v.heure}</span>
-                    <span className="text-white truncate">{v.produit}</span>
+                    <span className="text-white truncate">{v.produitNom}</span>
                     <span className="text-slate-500">×{v.quantite}</span>
                   </div>
                   <div className="flex items-center gap-2">
