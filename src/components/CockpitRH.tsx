@@ -316,7 +316,7 @@ const reapprovisionnerStock = async (id: string, quantiteAjoutee: number) => {
       <div className="bg-slate-800/50 rounded-lg p-3 text-center">
         <p className="text-xs text-slate-400 uppercase mb-1">Marge Potentielle</p>
         <p className="text-2xl font-bold text-green-400">
-          {produits.reduce((acc: number, p: any) => acc + ((Number(p.prix) - Number(p.prixAchat)) * Number(p.quantite)), 0).toLocaleString('fr-FR')} FCFA
+          {produits.reduce((acc: number, p: any) => acc + ((Number(p.prix) - Number(p.prixAchat || 0)) * Number(p.quantite)), 0).toLocaleString('fr-FR')} FCFA
         </p>
       </div>
 
