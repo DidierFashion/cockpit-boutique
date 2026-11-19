@@ -300,10 +300,9 @@ const reapprovisionnerStock = async (id: string, quantiteAjoutee: number) => {
       </div>
 
       {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-          <p className="text-xs text-slate-400 uppercase mb-1">Total produits</p>
-          <p style={{ color:'red',fontSize: '20px'}}></p>
+          <p className="text-xs text-slate-400 uppercase mb-1">Total produits</p>    
           <p className="text-2xl font-bold text-cyan-400">{(produits|| []).length}</p>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
@@ -983,7 +982,7 @@ useEffect(() => {
 
       {estAdmin && <ModuleGraphiques ventes={ventes} depenses={depenses} />}
        {estAdmin && <ModuleFinance ventes={ventes} depenses={depenses} />}
-      <ModuleVentes produits={produits}/>
+      <ModuleVentes produits={produits} ventes={ventes} />
       <ModuleProduits produits={produits} estAdmin={estAdmin} mdpPatron={mdpPatron} />
       <ModuleCalendrier employes={employes} />
 
@@ -1070,23 +1069,12 @@ useEffect(() => {
     </div>
   );
 }
-const ModuleVentes = ({ produits }: any) => {
-  const [ventes, setVentes] = useState<any[]>([]);
+const ModuleVentes = ({ produits, ventes }: any) => {  
   const [produitChoisi, setProduitChoisi] = useState('');
   const [rechercheProduit, setRechercheProduit] = useState('');
   const [quantiteVente, setQuantiteVente] = useState(1);
   const [message, setMessage] = useState('');
-   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "ventes"), (snapshot) => {
-      const ventesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as any;
-      setVentes(ventesData);
-    });
-    return () => unsubscribe();
-  }, []);
-
+   
   const produitsFiltresVente = (produits || []).filter((p: any) => 
      p.nom.toLowerCase().includes(rechercheProduit.toLowerCase())
    );
