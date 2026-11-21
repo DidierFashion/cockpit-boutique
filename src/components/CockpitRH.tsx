@@ -268,17 +268,46 @@ const FicheEmploye = ({ employe, onFermer, onSupprimer }: any) => {
     }
   };
 
-  const reapprovisionnerStock = async (id: string, quantiteAjoutee: number) => {
-    try {
-      const produit = produitsArray.find((p: any) => p.id === id);
-      if (produit) {
-        const nouveauStock = Number(produit.quantite) + quantiteAjoutee;
-        await updateDoc(doc(db, "produits", id), { quantite: nouveauStock });
+ const reapprovisionnerStock = async (id: string, quantiteAjoutee: number) => {
+  try {
+    const produitRef = doc(db, "produits", id);
+    
+    // 🚀 TRANSACTION ATOMIQUE pour le stock ET la dépense
+    await runTransaction(db, async (transaction) => {
+      const produitDoc = await transaction.get(produitRef);
+      if (!produitDoc.exists()) throw "Produit introuvable !";
+
+      const produitData = produitDoc.data();
+      const nouveauStock = Number(produitData.quantite) + quantiteAjoutee;
+      
+      // On calcule le coût de l'achat
+      const coutAchat = quantiteAjoutee * Number(produitData.prixAchat || 0);
+
+      // 1. Mettre à jour le stock
+      transaction.update(produitRef, { quantite: nouveauStock });
+
+      // 2. Créer la dépense automatiquement (si le prix d'achat est supérieur à 0)
+      if (coutAchat > 0) {
+        const maintenant = new Date();
+        const depenseRef = doc(collection(db, "depenses"));
+        transaction.set(depenseRef, {
+          description: `Achat stock : ${produitData.nom} (x${quantiteAjoutee})`,
+          categorie: 'Fournisseurs',
+          montant: Number(coutAchat),
+          date: maintenant.toLocaleDateString('fr-FR'),
+          mois: maintenant.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+          timestamp: maintenant.getTime(),
+          type: 'Achat_Stock'
+        });
       }
-    } catch (error) {
-      console.error("Erreur lors du réapprovisionnement : ", error);
-    }
-  };
+    });
+    
+    alert("✅ Stock mis à jour et dépense enregistrée !");
+  } catch (error) {
+    console.error("Erreur lors du réapprovisionnement : ", error);
+    alert("❌ Erreur lors du réapprovisionnement.");
+  }
+};
  
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
@@ -813,13 +842,37 @@ const ModuleVentes = ({ produits, ventes }: any) => {
     setTimeout(() => setMessage(''), 3000);
   }
 };
-const supprimerVente = async (id: string) => {
-  try { 
-    await deleteDoc(doc(db, "ventes", id)); 
-  } catch (error) { 
-    console.error(error); 
+const annulerVente = async (id: string, produitNom: string, quantite: number) => {
+  try {
+    const produit = produits.find((p: any) => p.nom === produitNom);
+    if (!produit) {
+      alert("Produit introuvable pour l'annulation.");
+      return;
+    }
+
+    // 🚀 TRANSACTION : Remet le stock et annule la vente
+    await runTransaction(db, async (transaction) => {
+      const produitRef = doc(db, "produits", produit.id);
+      const produitDoc = await transaction.get(produitRef);
+      
+      if (!produitDoc.exists()) throw "Produit introuvable !";
+      
+      const stockActuel = produitDoc.data().quantite;
+      
+      // 1. Remettre le stock
+      transaction.update(produitRef, { quantite: stockActuel + quantite });
+      
+      // 2. Supprimer (annuler) la vente
+      transaction.delete(doc(db, "ventes", id));
+    });
+
+    alert("✅ Vente annulée et stock restauré !");
+  } catch (error) {
+    console.error(error);
+    alert("❌ Erreur lors de l'annulation.");
   }
 };
+
   const topProduits = () => {
     const compteur: any = {};
     ventes.forEach((v: any) => { if (!compteur[v.produitNom]) compteur[v.produitNom] = { qte: 0, ca: 0 }; compteur[v.produitNom].qte += v.quantite; compteur[v.produitNom].ca += v.total; });
@@ -868,7 +921,7 @@ const supprimerVente = async (id: string) => {
               {ventes.slice(0, 10).map((v: any) => (
                 <div key={v.id} className="flex items-center justify-between gap-2 bg-slate-800/50 rounded-lg p-2 text-xs">
                   <div className="flex items-center gap-2 min-w-0"><span className="text-slate-500 font-mono">{v.heure}</span><span className="text-white truncate">{v.produitNom}</span><span className="text-slate-500">×{v.quantite}</span></div>
-                  <div className="flex items-center gap-2"><span className="text-green-400 font-bold">{v.total.toLocaleString('fr-FR')}</span><button onClick={() => supprimerVente(v.id)} className="text-red-400 hover:text-red-300"><Trash2 size={12} /></button></div>
+                  <div className="flex items-center gap-2"><span className="text-green-400 font-bold">{v.total.toLocaleString('fr-FR')}</span><button onClick={() => annulerVente(v.id, v.produitNom, v.quantite)} className="text-red-400 hover:text-red-300"><Trash2 size={12} /></button></div>
                 </div>
               ))}
             </div>
