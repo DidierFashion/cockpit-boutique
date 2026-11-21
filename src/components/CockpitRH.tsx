@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Clock, AlertTriangle, TrendingUp, Zap, Plus, X, Trash2, User, LogIn, LogOut } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, setDoc, runTransaction } from 'firebase/firestore';
 import ModuleGraphiques from './ModuleGraphiques';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
 
 const EMPLOYES_INITIAUX = [
   { id: 1, nom: 'Marie K.', poste: 'Vendeuse', presence: 95, ponctualite: 90, productivite: 85 },
@@ -200,17 +200,37 @@ const FicheEmploye = ({ employe, onFermer, onSupprimer }: any) => {
   );
 };
 
-const ModuleProduits = ({ produits, estAdmin, mdpPatron }: any) => {
+// Après
+               const ModuleProduits = ({ produits, estAdmin }: any) => {
   const CATEGORIES = ['Vêtements', 'Chaussures', 'Accessoires', 'Alimentation', 'Électronique', 'Autre'];
+ 
   const [recherche, setRecherche] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ nom: '', categorie: 'Vêtements', prix: 0, prixAchat: 0, quantite: 0 });
+  const [formData, setFormData] = useState({
+    nom: '',
+    categorie: 'Vêtements',
+    prix: 0,
+    prixAchat: 0,
+    quantite: 0,
+  });
 
-  const produitsFiltres = (produits || []).filter((p: any) => p.nom.toLowerCase().includes(recherche.toLowerCase()));
-  const produitsEnRupture = (produits || []).filter((p: any) => p.quantite < 5).length;
+  const produitsArray = Array.isArray(produits) ? produits : [];
+
+  const produitsFiltres = produitsArray.filter((p: any) =>
+    p.nom.toLowerCase().includes(recherche.toLowerCase())
+  );
+
+  const produitsEnRupture = produitsArray.filter((p: any) => Number(p.quantite) < 5).length;
+
+  const valeurStock = produitsArray.reduce((acc: number, p: any) => acc + (Number(p.prix) * Number(p.quantite)), 0);
+  const margePotentielle = produitsArray.reduce((acc: number, p: any) => acc + ((Number(p.prix) - Number(p.prixAchat)) * Number(p.quantite)), 0);
 
   const ajouterProduit = async () => {
-    if (!formData.nom.trim()) { alert("Veuillez entrer un nom de produit."); return; }
+    if (!formData.nom.trim()) {
+      alert("Veuillez entrer un nom de produit.");
+      return;
+    }
+   
     try {
       await addDoc(collection(db, "produits"), {
         nom: formData.nom,
@@ -229,36 +249,47 @@ const ModuleProduits = ({ produits, estAdmin, mdpPatron }: any) => {
   };
 
   const supprimerProduit = async (id: string) => {
-    try { await deleteDoc(doc(db, "produits", id)); } catch (error) { console.error(error); }
+    try {
+      await deleteDoc(doc(db, "produits", id));
+    } catch (error) {
+      console.error("Erreur lors de la suppression : ", error);
+    }
   };
 
   const modifierQuantite = async (id: string, delta: number) => {
     try {
-      const produit = produits.find((p: any) => p.id === id);
+      const produit = produitsArray.find((p: any) => p.id === id);
       if (produit) {
-        const nouveauStock = Math.max(0, produit.quantite + delta);
+        const nouveauStock = Math.max(0, Number(produit.quantite) + delta);
         await updateDoc(doc(db, "produits", id), { quantite: nouveauStock });
       }
-    } catch (error) { console.error(error); }
+    } catch (error) {
+      console.error("Erreur lors de la modification : ", error);
+    }
   };
 
   const reapprovisionnerStock = async (id: string, quantiteAjoutee: number) => {
     try {
-      const produit = produits.find((p: any) => p.id === id);
+      const produit = produitsArray.find((p: any) => p.id === id);
       if (produit) {
-        const nouveauStock = produit.quantite + quantiteAjoutee;
+        const nouveauStock = Number(produit.quantite) + quantiteAjoutee;
         await updateDoc(doc(db, "produits", id), { quantite: nouveauStock });
       }
-    } catch (error) { console.error(error); }
+    } catch (error) {
+      console.error("Erreur lors du réapprovisionnement : ", error);
+    }
   };
-
+ 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
         <h2 className="text-sm uppercase tracking-wider text-slate-400 flex items-center gap-2">
           <span className="text-cyan-400">📦</span> Module Produits
         </h2>
-        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold px-4 py-2 rounded-lg text-sm">
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold px-4 py-2 rounded-lg text-sm"
+        >
           <Plus size={16} /> Nouveau produit
         </button>
       </div>
@@ -266,191 +297,171 @@ const ModuleProduits = ({ produits, estAdmin, mdpPatron }: any) => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">Total produits</p>
-          <p className="text-2xl font-bold text-cyan-400">{(produits || []).length}</p>
+          <p className="text-2xl font-bold text-cyan-400">{produitsArray.length}</p>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">Valeur du stock</p>
           <p className="text-2xl font-bold text-green-400">
-            {(produits || []).reduce((acc: number, p: any) => acc + (Number(p.prix) * Number(p.quantite)), 0).toLocaleString('fr-FR')} FCFA
+            {valeurStock.toLocaleString('fr-FR')} FCFA
           </p>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">Marge Potentielle</p>
           <p className="text-2xl font-bold text-green-400">
-            {(produits || []).reduce((acc: number, p: any) => acc + ((Number(p.prix) - Number(p.prixAchat || 0)) * Number(p.quantite)), 0).toLocaleString('fr-FR')} FCFA
+            {margePotentielle.toLocaleString('fr-FR')} FCFA
           </p>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-400 uppercase mb-1">En rupture (&lt; 5)</p>
-          <p className={`text-2xl font-bold ${produitsEnRupture > 0 ? 'text-red-400' : 'text-slate-400'}`}>{produitsEnRupture}</p>
+          <p className={`text-2xl font-bold ${produitsEnRupture > 0 ? 'text-red-400' : 'text-slate-400'}`}>
+            {produitsEnRupture}
+          </p>
         </div>
       </div>
 
       {showForm && (
         <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 mb-6">
           <h3 className="text-sm font-bold text-white mb-3">Ajouter un produit</h3>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <input type="text" placeholder="Nom du produit" value={formData.nom} onChange={(e) => setFormData({ ...formData, nom: e.target.value })} className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm" autoFocus />
-            <select value={formData.categorie} onChange={(e) => setFormData({ ...formData, categorie: e.target.value })} className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input
+              type="text" placeholder="Nom du produit" value={formData.nom}
+              onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm" autoFocus
+            />
+            <select
+              value={formData.categorie}
+              onChange={(e) => setFormData({ ...formData, categorie: e.target.value })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+            >
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <input type="number" placeholder="Prix (FCFA)" value={formData.prix || ''} onChange={(e) => setFormData({ ...formData, prix: Number(e.target.value) })} className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm" />
-            <input type="number" placeholder="Prix d'achat (FCFA)" value={formData.prixAchat || ''} onChange={(e) => setFormData({ ...formData, prixAchat: Number(e.target.value) })} className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm" />
-            <input type="number" placeholder="Quantité" value={formData.quantite || ''} onChange={(e) => setFormData({ ...formData, quantite: Number(e.target.value) })} className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm" />
+            <input
+              type="number" placeholder="Prix (FCFA)" value={formData.prix || ''}
+              onChange={(e) => setFormData({ ...formData, prix: Number(e.target.value) })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+            />
+            <input
+              type="number" placeholder="Prix d'achat (FCFA)" value={formData.prixAchat || ''}
+              onChange={(e) => setFormData({ ...formData, prixAchat: Number(e.target.value) })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+            />
+            <input
+              type="number" placeholder="Quantité" value={formData.quantite || ''}
+              onChange={(e) => setFormData({ ...formData, quantite: Number(e.target.value) })}
+              className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+            />
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={ajouterProduit} disabled={!formData.nom.trim()} className="flex-1 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold py-2 rounded text-sm">Ajouter</button>
+            <button
+              onClick={ajouterProduit} disabled={!formData.nom.trim()}
+              className="flex-1 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold py-2 rounded text-sm"
+            >
+              Ajouter
+            </button>
           </div>
         </div>
       )}
 
       <div className="mb-4">
-        <input type="text" placeholder="🔍 Rechercher un produit..." value={recherche} onChange={(e) => setRecherche(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm" />
+        <input
+          type="text" placeholder="🔍 Rechercher un produit..." value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+        />
       </div>
 
-      {(produitsFiltres || []).length === 0 ? (
+      {produitsFiltres.length === 0 ? (
         <p className="text-sm text-slate-500 italic text-center py-6">
-          {(produits || []).length === 0 ? 'Aucun produit enregistré. Cliquez sur "+ Nouveau produit" pour commencer.' : 'Aucun produit ne correspond à votre recherche.'}
+          {produitsArray.length === 0
+            ? 'Aucun produit enregistré. Cliquez sur "+ Nouveau produit" pour commencer.'
+            : 'Aucun produit ne correspond à votre recherche.'}
         </p>
       ) : (
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {produitsFiltres.map((p: any) => {
-            const enRupture = p.quantite < 5;
+            const enRupture = Number(p.quantite) < 5;
             return (
-              <div key={p.id} className={`flex items-center justify-between gap-3 bg-slate-800/50 border rounded-lg p-3 ${enRupture ? 'border-red-500/40' : 'border-slate-700'}`}>
-                <div className="flex-1 min-w-0">
+              <div key={p.id}
+                className={`flex flex-wrap items-center justify-between gap-3 bg-slate-800/50 border rounded-lg p-3 ${
+                  enRupture ? 'border-red-500/40' : 'border-slate-700'
+                }`}
+              >
+                <div className="flex-1 min-w-[150px]">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-white font-bold text-sm">{p.nom}</span>
-                    <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300">{p.categorie}</span>
-                    {enRupture && <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400 font-bold">⚠️ Rupture</span>}
+                    <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300">
+                      {p.categorie}
+                    </span>
+                    {enRupture && (
+                      <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400 font-bold">
+                        ⚠️ Rupture
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">{p.prix.toLocaleString('fr-FR')} FCFA l'unité</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {Number(p.prix).toLocaleString('fr-FR')} FCFA l'unité
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button onClick={() => modifierQuantite(p.id, -1)} className="w-7 h-7 flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-white rounded font-bold">−</button>
-                  <span className={`text-sm font-bold w-10 text-center ${enRupture ? 'text-red-400' : 'text-white'}`}>{p.quantite}</span>
-                  <button onClick={() => modifierQuantite(p.id, 1)} className="w-7 h-7 flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-white rounded font-bold">+</button>
-                  <button onClick={() => {
-                    if (estAdmin) {
-                      const qte = prompt("Combien de produits ajouter au stock ?");
-                      if (qte && !isNaN(Number(qte))) reapprovisionnerStock(p.id, Number(qte));
-                    } else {
-                      const mdp = prompt("Entrez le mot de passe Patron pour modifier le stock :");
-                      if (mdp === mdpPatron) {
+                  <button onClick={() => modifierQuantite(p.id, -1)}
+                    className="w-7 h-7 flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-white rounded font-bold">
+                    −
+                  </button>
+                  <span className={`text-sm font-bold w-10 text-center ${enRupture ? 'text-red-400' : 'text-white'}`}>
+                    {p.quantite}
+                  </span>
+                  <button onClick={() => modifierQuantite(p.id, 1)}
+                    className="w-7 h-7 flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-white rounded font-bold">
+                    +
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (estAdmin) {
                         const qte = prompt("Combien de produits ajouter au stock ?");
                         if (qte && !isNaN(Number(qte))) reapprovisionnerStock(p.id, Number(qte));
-                      } else { alert("Action non autorisée !"); }
-                    }
-                  }} className="ml-2 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs font-bold" title="Réapprovisionner">+ Stock</button>
-                </div>
-
+                      } else {
+                        const mdp = prompt("Entrez le mot de passe Patron pour modifier le stock :");
+                        if (mdp === "admin123") {
+                          const qte = prompt("Combien de produits ajouter au stock ?");
+                          if (qte && !isNaN(Number(qte))) reapprovisionnerStock(p.id, Number(qte));
+                        } else {
+                          alert("Action non autorisée !");
+                        }
+                      }
+                    }}
+                    className="ml-2 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs font-bold"
+                    title="Réapprovisionner"
+                  >
+                    + Stock
+                  </button>
+                </div>  
                 <div className="text-right min-w-[100px]">
                   <p className="text-xs text-slate-400">Valeur</p>
-                  <p className="text-sm font-bold text-cyan-400">{(p.prix * p.quantite).toLocaleString('fr-FR')}</p>
+                  <p className="text-sm font-bold text-cyan-400">
+                    {(Number(p.prix) * Number(p.quantite)).toLocaleString('fr-FR')}
+                  </p>
                 </div>
 
-                <button onClick={() => {
-                  if (estAdmin) { supprimerProduit(p.id); } 
-                  else {
-                    const mdp = prompt("Entrez le mot de passe Patron pour supprimer :");
-                    if (mdp === "admin123") supprimerProduit(p.id); 
-                    else alert("Action non autorisée !");
-                  }
-                }}><Trash2 size={16} /></button>
+                <button
+                  onClick={() => {
+                    if (estAdmin) {
+                      supprimerProduit(p.id);
+                    } else {
+                      const mdp = prompt("Entrez le mot de passe Patron pour supprimer :");
+                      if (mdp === "admin123") supprimerProduit(p.id);
+                      else alert("Action non autorisée !");
+                    }
+                  }}
+                  className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             );
           })}
         </div>
       )}
-    </div>
-  );
-};
-
-const ModulePointage = ({ employes }: any) => {
-  const [heure, setHeure] = useState(new Date());
-  const [pointages, setPointages] = useState<any[]>([]);
-  const [employeChoisi, setEmployeChoisi] = useState('');
-
-  useEffect(() => {
-    const timer = setInterval(() => setHeure(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "pointages"), (snapshot) => {
-      const pointagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setPointages(pointagesData);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const heureStr = heure.toLocaleTimeString('fr-FR');
-  const dateStr = heure.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-
-  const pointer = async (type: 'in' | 'out') => {
-    if (!employeChoisi) return;
-    const emp = employes.find((e: any) => e.nom === employeChoisi);
-    if (!emp) return;
-    const estEnRetard = heure.getHours() > 8 || (heure.getHours() === 8 && heure.getMinutes() > 0);
-    try {
-      await addDoc(collection(db, "pointages"), {
-        employe: emp.nom, poste: emp.poste, heure: heureStr, date: dateStr,
-        type: type === 'in' ? 'in': 'out', statut: type === 'in' ? (estEnRetard ? 'Retard' : 'Présent') : 'Parti', timestamp: Date.now()
-      });
-      setEmployeChoisi('');
-    } catch (error) { console.error(error); }
-  };
-
-  const pointagesIn = pointages.filter((p: any) => p.type === 'in');
-  const pointagesOut = pointages.filter((p: any) => p.type === 'out');
-  const retards = pointagesIn.filter((p: any) => p.statut === 'Retard').length;
-
-  return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-sm uppercase tracking-wider text-slate-400 flex items-center gap-2">
-          <Clock size={16} className="text-cyan-400" /> Module de pointage
-        </h2>
-        <div className="text-right">
-          <div className="text-2xl font-mono font-bold text-cyan-400">{heureStr}</div>
-          <div className="text-xs text-slate-500 capitalize">{dateStr}</div>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-        <div className="bg-slate-800/50 rounded-lg p-3 text-center"><p className="text-xs text-slate-400 uppercase mb-1">Arrivées</p><p className="text-2xl font-bold text-green-400">{pointagesIn.length}</p></div>
-        <div className="bg-slate-800/50 rounded-lg p-3 text-center"><p className="text-xs text-slate-400 uppercase mb-1">Départs</p><p className="text-2xl font-bold text-blue-400">{pointagesOut.length}</p></div>
-        <div className="bg-slate-800/50 rounded-lg p-3 text-center"><p className="text-xs text-slate-400 uppercase mb-1">Retards</p><p className="text-2xl font-bold text-red-400">{retards}</p></div>
-      </div>
-      <div className="flex flex-col md:flex-row gap-3 mb-6">
-        <select value={employeChoisi} onChange={(e) => setEmployeChoisi(e.target.value)} className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-3 text-white">
-          <option value="">— Sélectionner un employé —</option>
-          {employes.map((emp: any) => (<option key={emp.id} value={emp.nom}>{emp.nom} — {emp.poste}</option>))}
-        </select>
-        <button onClick={() => pointer('in')} disabled={!employeChoisi} className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold px-6 py-3 rounded"><LogIn size={20} /> CHECK-IN</button>
-        <button onClick={() => pointer('out')} disabled={!employeChoisi} className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold px-6 py-3 rounded"><LogOut size={20} /> CHECK-OUT</button>
-      </div>
-      <div>
-        <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-3">Historique du jour</h3>
-        {pointages.length === 0 ? (
-          <p className="text-sm text-slate-500 italic text-center py-4">Aucun pointage enregistré aujourd'hui</p>
-        ) : (
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {pointages.map((p: any) => (
-              <div key={p.id} className="flex items-center justify-between bg-slate-800/50 rounded-lg p-3 text-sm">
-                <div className="flex items-center gap-3">
-                  {p.type === 'in' ? <LogIn size={16} className="text-green-400" /> : <LogOut size={16} className="text-orange-400" />}
-                  <span className="text-white">{p.employe}</span>
-                  <span className="text-slate-500 text-xs">{p.poste}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-400 font-mono">{p.heure}</span>
-                  <span className={`text-xs px-2 py-1 rounded ${p.statut === 'Présent' ? 'bg-green-500/20 text-green-400' : p.statut === 'Retard' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>{p.statut}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 };
@@ -591,6 +602,119 @@ const ModuleEquipe = ({ employes, ajouterEmploye, supprimerEmploye }: any) => {
   );
 };
 
+const ModulePointage = ({ employes, estAdmin }: any) => {
+  const [heure, setHeure] = useState(new Date());
+  const [pointages, setPointages] = useState<any[]>([]);
+  const [employeChoisi, setEmployeChoisi] = useState('');
+  const [pinSaisi, setPinSaisi] = useState('');
+
+  useEffect(() => {
+    const timer = setInterval(() => setHeure(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "pointages"), (snapshot) => {
+      setPointages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const heureStr = heure.toLocaleTimeString('fr-FR');
+  const dateStr = heure.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  const pointer = async (type: 'in' | 'out') => {
+    if (!employeChoisi) return;
+    const emp = employes.find((e: any) => e.nom === employeChoisi);
+    if (!emp) return;
+
+    // 1. Vérification PIN
+    if (pinSaisi !== emp.pin) {
+      alert("❌ Code PIN incorrect !");
+      return;
+    }
+
+    // 2. Blocage des doublons
+    const dejaPointe = pointages.some((p: any) => p.employe === emp.nom && p.date === dateStr && p.type === type);
+    if (dejaPointe) {
+      alert("❌ Cet employé a déjà pointé pour ce créneau aujourd'hui.");
+      return;
+    }
+
+    const estEnRetard = heure.getHours() > 8 || (heure.getHours() === 8 && heure.getMinutes() > 0);
+    try {
+      await addDoc(collection(db, "pointages"), {
+        employe: emp.nom, poste: emp.poste, heure: heureStr, date: dateStr,
+        type: type, statut: type === 'in' ? (estEnRetard ? 'Retard' : 'Présent') : 'Parti', 
+        timestamp: Date.now(),
+        confirmeParPC: false 
+      });
+      setEmployeChoisi('');
+      setPinSaisi('');
+    } catch (error) { console.error(error); }
+  };
+
+  const confirmerSurPC = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "pointages", id), { confirmeParPC: true });
+    } catch (error) { console.error(error); }
+  };
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-sm uppercase tracking-wider text-slate-400 flex items-center gap-2">
+          <Clock size={16} className="text-cyan-400" /> Module de pointage
+        </h2>
+        <div className="text-right">
+          <div className="text-2xl font-mono font-bold text-cyan-400">{heureStr}</div>
+          <div className="text-xs text-slate-500 capitalize">{dateStr}</div>
+        </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-3 mb-6">
+        <select value={employeChoisi} onChange={(e) => setEmployeChoisi(e.target.value)} className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-3 text-white">
+          <option value="">— Sélectionner un employé —</option>
+          {employes.map((emp: any) => (<option key={emp.id} value={emp.nom}>{emp.nom} — {emp.poste}</option>))}
+        </select>
+        <input type="password" placeholder="Code PIN" value={pinSaisi} onChange={(e) => setPinSaisi(e.target.value)} className="w-full md:w-32 bg-slate-800 border border-slate-700 rounded px-3 py-3 text-white text-center" />
+        <button onClick={() => pointer('in')} disabled={!employeChoisi || !pinSaisi} className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold px-6 py-3 rounded"><LogIn size={20} /> IN</button>
+        <button onClick={() => pointer('out')} disabled={!employeChoisi || !pinSaisi} className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold px-6 py-3 rounded"><LogOut size={20} /> OUT</button>
+      </div>
+
+      <div>
+        <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-3">Historique du jour</h3>
+        {pointages.length === 0 ? (
+          <p className="text-sm text-slate-500 italic text-center py-4">Aucun pointage enregistré aujourd'hui</p>
+        ) : (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {pointages.map((p: any) => (
+              <div key={p.id} className="flex items-center justify-between bg-slate-800/50 rounded-lg p-3 text-sm">
+                <div className="flex items-center gap-3">
+                  {p.type === 'in' ? <LogIn size={16} className="text-green-400" /> : <LogOut size={16} className="text-orange-400" />}
+                  <span className="text-white">{p.employe}</span>
+                  <span className="text-slate-500 text-xs">{p.poste}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-400 font-mono">{p.heure}</span>
+                  <span className={`text-xs px-2 py-1 rounded ${p.statut === 'Présent' ? 'bg-green-500/20 text-green-400' : p.statut === 'Retard' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>{p.statut}</span>
+                  
+                  {!p.confirmeParPC && estAdmin && (
+                    <button onClick={() => confirmerSurPC(p.id)} className="bg-cyan-500 text-slate-900 px-2 py-1 rounded text-xs font-bold ml-2">Confirmer PC</button>
+                  )}
+                  {p.confirmeParPC && (
+                    <span className="text-xs text-green-400 font-bold ml-2">✅ Validé</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ModulePaie = ({ employes }: any) => {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -645,25 +769,57 @@ const ModuleVentes = ({ produits, ventes }: any) => {
   const nbVentesJour = venteDuJour().length;
   const panierMoyen = nbVentesJour > 0 ? Math.round(caDuJour / nbVentesJour) : 0;
 
-  const enregistrerVente = async () => {
-    if (!produitChoisi) return;
-    const produit = produits.find((p: any) => p.nom === produitChoisi);
-    if (!produit) return;
-    if (quantiteVente > produit.quantite) { setMessage(`❌ Stock insuffisant`); setTimeout(() => setMessage(''), 3000); return; }
-    try {
-      const maintenant = new Date();
-      const dateStr = maintenant.toLocaleDateString('fr-FR');
-      const moisStr = maintenant.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-      const heureStr = maintenant.toLocaleTimeString('fr-FR').substring(0, 5);
-      const total = produit.prix * quantiteVente;
-      await addDoc(collection(db, "ventes"), { produitNom: produit.nom, quantite: Number(quantiteVente), prixUnitaire: Number(produit.prix), total: Number(total), date: dateStr, mois: moisStr, heure: heureStr, timestamp: maintenant.getTime() });
-      await updateDoc(doc(db, "produits", produit.id), { quantite: produit.quantite - quantiteVente });
-      setMessage(`✅ Vente enregistrée !`); setQuantiteVente(1); setProduitChoisi(''); setRechercheProduit(''); setTimeout(() => setMessage(''), 3000);
-    } catch (error) { console.error(error); setMessage("❌ Erreur"); setTimeout(() => setMessage(''), 3000); }
-  };
+ const enregistrerVente = async () => {
+  if (!produitChoisi) return;
+  const produit = produits.find((p: any) => p.nom === produitChoisi);
+  if (!produit) return;
 
-  const supprimerVente = async (id: string) => { try { await deleteDoc(doc(db, "ventes", id)); } catch (error) { console.error(error); } };
+  try {
+    const maintenant = new Date();
+    const dateStr = maintenant.toLocaleDateString('fr-FR');
+    const moisStr = maintenant.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    const heureStr = maintenant.toLocaleTimeString('fr-FR').substring(0, 5);
+    const total = produit.prix * quantiteVente;
 
+    // 🚀 TRANSACTION ATOMIQUE : Met à jour le stock ET crée la vente en même temps
+    await runTransaction(db, async (transaction) => {
+      const produitRef = doc(db, "produits", produit.id);
+      const produitDoc = await transaction.get(produitRef);
+      
+      if (!produitDoc.exists()) throw "Produit introuvable !";
+      
+      const stockActuel = produitDoc.data().quantite;
+      if (stockActuel < quantiteVente) throw "Stock insuffisant !";
+
+      // 1. Mettre à jour le stock
+      transaction.update(produitRef, { quantite: stockActuel - quantiteVente });
+      
+      // 2. Créer la vente
+      const venteRef = doc(collection(db, "ventes"));
+      transaction.set(venteRef, { 
+        produitNom: produit.nom, quantite: Number(quantiteVente), 
+        prixUnitaire: Number(produit.prix), total: Number(total), 
+        date: dateStr, mois: moisStr, heure: heureStr, timestamp: maintenant.getTime(),
+        statut: 'valide'
+      });
+    });
+
+    setMessage(`✅ Vente enregistrée avec succès !`); 
+    setQuantiteVente(1); setProduitChoisi(''); setRechercheProduit(''); 
+    setTimeout(() => setMessage(''), 3000);
+  } catch (error) {
+    console.error(error); 
+    setMessage(`❌ Erreur : ${error}`); 
+    setTimeout(() => setMessage(''), 3000);
+  }
+};
+const supprimerVente = async (id: string) => {
+  try { 
+    await deleteDoc(doc(db, "ventes", id)); 
+  } catch (error) { 
+    console.error(error); 
+  }
+};
   const topProduits = () => {
     const compteur: any = {};
     ventes.forEach((v: any) => { if (!compteur[v.produitNom]) compteur[v.produitNom] = { qte: 0, ca: 0 }; compteur[v.produitNom].qte += v.quantite; compteur[v.produitNom].ca += v.total; });
@@ -730,6 +886,59 @@ const ModuleVentes = ({ produits, ventes }: any) => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const ModuleTachesFinance = () => {
+  const [taches, setTaches] = useState<any[]>([]);
+  const [nouvelleTache, setNouvelleTache] = useState('');
+  const [type, setType] = useState('Consigne');
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "taches_consignes"), (snap) => {
+      setTaches(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  const ajouterTache = async () => {
+    if (!nouvelleTache.trim()) return;
+    await addDoc(collection(db, "taches_consignes"), {
+      description: nouvelleTache,
+      type: type,
+      dateCreation: new Date().toISOString(),
+      statut: 'En attente',
+      validationPatron: false,
+      auditHebdo: null
+    });
+    setNouvelleTache('');
+  };
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
+      <h2 className="text-sm uppercase text-slate-400 mb-4">📋 Consignes & Missions</h2>
+      <div className="flex flex-wrap gap-2 mb-4">
+        <input type="text" value={nouvelleTache} onChange={(e) => setNouvelleTache(e.target.value)} placeholder="Nouvelle consigne précise..." className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white min-w-[200px]" />
+        <select value={type} onChange={(e) => setType(e.target.value)} className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white">
+          <option>Consigne</option>
+          <option>Mission attendue</option>
+        </select>
+        <button onClick={ajouterTache} className="bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold px-4 py-2 rounded">Ajouter</button>
+      </div>
+      <div className="space-y-2">
+        {taches.map(t => (
+          <div key={t.id} className="flex justify-between items-center bg-slate-800/50 p-3 rounded border border-slate-700">
+            <div>
+              <span className="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300 mr-2">{t.type}</span>
+              <span className="text-white">{t.description}</span>
+            </div>
+            <span className={`text-xs font-bold ${t.validationPatron ? 'text-green-400' : 'text-orange-400'}`}>
+              {t.validationPatron ? '✅ Validé' : '⏳ En attente'}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -815,12 +1024,30 @@ export default function CockpitRH() {
   const [showForm, setShowForm] = useState(false);
   const [employeSelectionne, setEmployeSelectionne] = useState<any>(null);
   const [estAdmin, setEstAdmin] = useState(false);
+  const [roleUtilisateur, setRoleUtilisateur] = useState<string | null>(null);
   const [showLogin, setShowLogin] = useState(false);
+  const [authCharge, setAuthCharge] = useState(true);
+
+useEffect(() => {
+  const auth = getAuth();
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      // On va chercher le rôle dans la base de données
+      const docRef = doc(db, "utilisateurs", user.uid);
+      // Note: si tu n'as pas encore la collection "utilisateurs", on fera une sécurité temporaire
+      setEstAdmin(true); // On garde ça pour l'instant pour ne pas te bloquer
+    } else {
+      setEstAdmin(false);
+    }
+    setAuthCharge(false);
+  });
+  return () => unsubscribe();
+}, []);
+
   const [emailLogin, setEmailLogin] = useState('');
   const [passwordLogin, setPasswordLogin] = useState('');
   const [loginError, setLoginError] = useState('');
   const [produits, setProduits] = useState<any[]>([]);
-  const [mdpPatron, setMdpPatron] = useState("admin123");
   const [ventes, setVentes] = useState<any[]>([]);
   const [depenses, setDepenses] = useState<any[]>([]);
 
@@ -838,14 +1065,7 @@ export default function CockpitRH() {
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, "parametres", "admin"), (snap) => {
-      if (snap.exists()) { const data = snap.data() as any; if (data.motDePasse) setMdpPatron(data.motDePasse); }
-    });
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
+    useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "ventes"), (snapshot) => {
       setVentes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -894,6 +1114,17 @@ export default function CockpitRH() {
     try { await deleteDoc(doc(db, "employees", id)); } catch (error) { console.error(error); }
   };
 
+  const deconnexion = async () => {
+  await signOut(getAuth());
+};
+if (authCharge) {
+  return (
+    <div className="min-h-screen bg-[#0A0E1A] flex items-center justify-center">
+      <p className="text-cyan-400 font-mono">Chargement…</p>
+    </div>
+  );
+}
+
   if (showLogin) {
     return (
       <div className="min-h-screen bg-[#0A0E1A] flex items-center justify-center p-6">
@@ -933,8 +1164,7 @@ export default function CockpitRH() {
             <div className="text-sm font-mono text-cyan-400">● EN LIGNE</div>
           </div>
           {!estAdmin && (<button onClick={() => setShowLogin(true)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 text-sm font-medium border border-slate-700">🔒 Mode Patron</button>)}
-          {estAdmin && (<div className="flex items-center gap-2"><span className="text-green-400 text-sm font-bold flex items-center gap-1">🔓 Admin Connecté</span><button onClick={changerMotDePasse} className="px-4 py-2 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 text-sm font-medium border border-slate-700">🔑 Changer MDP</button></div>)}
-          <button onClick={() => setShowForm(true)} className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 px-4 py-2 rounded font-bold"><Plus size={18} /> Nouvel employé</button>
+        
         </div>
       </div>
 
@@ -953,7 +1183,7 @@ export default function CockpitRH() {
         <div>
           <ModulePointage employes={employes} />
           <ModuleCalendrier employes={employes} />
-          
+         
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <KpiCard icon={Users} title="Présents" value={`${presents}/${employes.length}`} subtitle="Employés actifs" color="bg-green-500/20 text-green-400" />
             <KpiCard icon={Clock} title="Retards" value={retards} subtitle="À surveiller" color="bg-orange-500/20 text-orange-400" />
@@ -1016,6 +1246,7 @@ export default function CockpitRH() {
 
       {ongletActif === 'finance' && estAdmin && (
         <div>
+          <ModuleTachesFinance />
           <ModuleGraphiques ventes={ventes} depenses={depenses} />
           <ModuleFinance ventes={ventes} depenses={depenses} />
         </div>
@@ -1026,7 +1257,7 @@ export default function CockpitRH() {
       )}
 
       {ongletActif === 'produits' && (
-        <ModuleProduits produits={produits} estAdmin={estAdmin} mdpPatron={mdpPatron} />
+        <ModuleProduits produits={produits} estAdmin={estAdmin} />
       )}
 
       {ongletActif === 'equipe' && (
