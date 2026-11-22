@@ -752,6 +752,28 @@ const ModulePointage = ({ employes, estAdmin }: any) => {
 };
 
 const ModulePaie = ({ employes }: any) => {
+  
+  const [avances, setAvances] = useState<any[]>([]);
+const [nouvelleAvance, setNouvelleAvance] = useState({ nom: '', montant: 0 });
+
+useEffect(() => {
+  const unsub = onSnapshot(collection(db, "avances"), (snap) => {
+    setAvances(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  });
+  return () => unsub();
+}, []);
+
+const demanderAvance = async () => {
+  if (!nouvelleAvance.nom || nouvelleAvance.montant <= 0) return;
+  await addDoc(collection(db, "avances"), {
+    nom: nouvelleAvance.nom,
+    montant: Number(nouvelleAvance.montant),
+    date: new Date().toLocaleDateString('fr-FR'),
+    statut: 'En attente'
+  });
+  setNouvelleAvance({ nom: '', montant: 0 });
+};
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
       <h2 className="text-sm uppercase tracking-wider text-slate-400 mb-4">💵 Calcul de Paie et Primes</h2>
@@ -784,7 +806,7 @@ const net = base + prime - avances - retardsDeduction;
               return (
                 <tr key={emp.id} className="border-b border-slate-800 hover:bg-slate-800/50">
                   <td className="px-4 py-3 font-bold text-white">{emp.nom}</td>
-                  <td className="px-4 py-3">FCFA{base.toLocaleString('fr-FR')} FCFA</td>
+                  <td className="px-4 py-3">{base.toLocaleString('fr-FR')} FCFA</td>
                   <td className={`px-4 py-3 font-bold FCFA{scoreGlobal >= 80 ? 'text-green-400' : scoreGlobal >= 60 ? 'text-orange-400' : 'text-red-400'}`}>{scoreGlobal}</td>
                   <td className="px-4 py-3 text-green-400">{prime.toLocaleString('fr-FR')} FCFA</td>
                   <td className="px-4 py-3 text-red-400">-FCFA{avances.toFixed(2)}</td>
@@ -796,6 +818,31 @@ const net = base + prime - avances - retardsDeduction;
             })}
           </tbody>
         </table>
+        {/* Section Avances */}
+<div className="mt-8 border-t border-slate-800 pt-6">
+  <h3 className="text-sm uppercase text-slate-400 mb-4">💸 Demandes d'avance sur salaire</h3>
+  <div className="flex gap-2 mb-4">
+    <select value={nouvelleAvance.nom} onChange={(e) => setNouvelleAvance({...nouvelleAvance, nom: e.target.value})} className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white">
+      <option value="">— Choisir un employé —</option>
+      {employes.map((emp: any) => <option key={emp.id} value={emp.nom}>{emp.nom}</option>)}
+    </select>
+    <input type="number" placeholder="Montant" value={nouvelleAvance.montant || ''} onChange={(e) => setNouvelleAvance({...nouvelleAvance, montant: Number(e.target.value)})} className="w-32 bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white" />
+    <button onClick={demanderAvance} className="bg-cyan-500 text-slate-900 font-bold px-4 py-2 rounded">Demander</button>
+  </div>
+  
+  <div className="space-y-2">
+    {avances.map((av: any) => (
+      <div key={av.id} className="flex justify-between items-center bg-slate-800/50 p-3 rounded border border-slate-700 text-sm">
+        <div><span className="text-white font-bold">{av.nom}</span> - {av.date}</div>
+        <div className="flex items-center gap-3">
+          <span className="text-red-400 font-bold">{av.montant.toLocaleString()} FCFA</span>
+          <span className={`text-xs px-2 py-1 rounded ${av.statut === 'Validé' ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>{av.statut}</span>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
       </div>
     </div>
   );
