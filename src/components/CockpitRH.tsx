@@ -576,23 +576,40 @@ const ModuleCalendrier = ({ employes }: any) => {
   );
 };
 
-const ModuleEquipe = ({ employes, ajouterEmploye, supprimerEmploye }: any) => {
-  const [form, setForm] = useState({ nom: '', poste: 'Vendeur', salaireBase: 0, pin: '', arrivee: '08:30', depart: '17:30', telephone: '' });
+const ModuleEquipe = ({ employes, ajouterEmploye, supprimerEmploye, modifierEmploye }: any) => {
+  const [form, setForm] = useState({ nom: '', poste: 'Vendeur', salaireBase: 0, pin: '', telephone: '' });
 
   const handleAjouter = () => {
-    if (!form.nom) return;
+    if (!form.nom.trim()) return alert("Le nom est obligatoire.");
+    if (!form.pin.trim()) return alert("Le code PIN est obligatoire pour le pointage.");
     ajouterEmploye(form);
-    setForm({ nom: '', poste: 'Vendeur', salaireBase: 0, pin: '', arrivee: '08:30', depart: '17:30', telephone: '' });
+    setForm({ nom: '', poste: 'Vendeur', salaireBase: 0, pin: '', telephone: '' });
   };
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
       <h2 className="text-sm uppercase tracking-wider text-slate-400 mb-4">👥 Gestion de l'Équipe</h2>
-      <div className="overflow-x-auto mb-6">
+      
+      {/* Formulaire d'ajout */}
+      <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-4 mb-6">
+        <h3 className="text-xs uppercase text-slate-400 mb-3">Ajouter un nouvel employé</h3>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+          <input placeholder="Nom complet" value={form.nom} onChange={e => setForm({...form, nom: e.target.value})} className="bg-slate-900 border border-slate-700 rounded px-2 py-2 text-white text-sm" />
+          <select value={form.poste} onChange={e => setForm({...form, poste: e.target.value})} className="bg-slate-900 border border-slate-700 rounded px-2 py-2 text-white text-sm">
+            <option>Gérant</option><option>Vendeur</option><option>Caissier</option><option>Magasinier</option><option>Superviseur</option>
+          </select>
+          <input type="number" placeholder="Salaire de base (FCFA)" value={form.salaireBase || ''} onChange={e => setForm({...form, salaireBase: Number(e.target.value)})} className="bg-slate-900 border border-slate-700 rounded px-2 py-2 text-white text-sm" />
+          <input placeholder="Code PIN (4 chiffres)" value={form.pin} onChange={e => setForm({...form, pin: e.target.value})} className="bg-slate-900 border border-slate-700 rounded px-2 py-2 text-white text-sm" />
+          <button onClick={handleAjouter} className="bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold rounded text-sm py-2">Ajouter l'employé</button>
+        </div>
+      </div>
+
+      {/* Liste des employés */}
+      <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-slate-300">
           <thead className="text-xs uppercase bg-slate-800 text-slate-400">
             <tr>
-              <th className="px-3 py-3">Nom</th><th className="px-3 py-3">Poste</th><th className="px-3 py-3">Base ($)</th><th className="px-3 py-3">PIN</th><th className="px-3 py-3">Arrivée</th><th className="px-3 py-3">Départ</th><th className="px-3 py-3">Téléphone</th><th className="px-3 py-3">Actions</th>
+              <th className="px-3 py-3">Nom</th><th className="px-3 py-3">Poste</th><th className="px-3 py-3">Salaire Base</th><th className="px-3 py-3">Code PIN</th><th className="px-3 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -600,32 +617,27 @@ const ModuleEquipe = ({ employes, ajouterEmploye, supprimerEmploye }: any) => {
               <tr key={emp.id} className="border-b border-slate-800 hover:bg-slate-800/50">
                 <td className="px-3 py-2 font-bold text-white">{emp.nom}</td>
                 <td className="px-3 py-2">{emp.poste}</td>
-                <td className="px-3 py-2 text-green-400">${emp.salaireBase || 0}</td>
-                <td className="px-3 py-2 font-mono">{emp.pin || '-'}</td>
-                <td className="px-3 py-2">{emp.arrivee || '08:30'}</td>
-                <td className="px-3 py-2">{emp.depart || '17:30'}</td>
-                <td className="px-3 py-2">{emp.telephone || '-'}</td>
+                <td className="px-3 py-2 text-green-400">{emp.salaireBase?.toLocaleString() || 0} FCFA</td>
+                <td className="px-3 py-2 font-mono text-cyan-400">{emp.pin || 'Non défini'}</td>
                 <td className="px-3 py-2">
                   <button onClick={() => supprimerEmploye(emp.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
+                <button 
+  onClick={() => {
+    const nouveauSalaire = prompt(`Nouveau salaire pour ${emp.nom} (actuel: ${emp.salaireBase || 0}) :`, emp.salaireBase || 0);
+    const nouveauPin = prompt(`Nouveau code PIN pour ${emp.nom} (actuel: ${emp.pin || 'Non défini'}) :`, emp.pin || '');
+    if (nouveauSalaire !== null && nouveauPin !== null) {
+      modifierEmploye(emp.id, Number(nouveauSalaire), nouveauPin);
+    }
+  }} 
+  className="text-cyan-400 hover:text-cyan-300 mr-3"
+>
+  <User size={16} />
+</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-      <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-4">
-        <h3 className="text-xs uppercase text-slate-400 mb-3">Ajouter un employé</h3>
-        <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
-          <input placeholder="Nom" value={form.nom} onChange={e => setForm({...form, nom: e.target.value})} className="bg-slate-900 border border-slate-700 rounded px-2 py-2 text-white text-sm" />
-          <select value={form.poste} onChange={e => setForm({...form, poste: e.target.value})} className="bg-slate-900 border border-slate-700 rounded px-2 py-2 text-white text-sm">
-            <option>Propriétaire</option><option>Gérant</option><option>Vendeur</option><option>Caissier</option><option>Magasinier</option>
-          </select>
-          <input type="number" placeholder="Base ($)" value={form.salaireBase || ''} onChange={e => setForm({...form, salaireBase: Number(e.target.value)})} className="bg-slate-900 border border-slate-700 rounded px-2 py-2 text-white text-sm" />
-          <input placeholder="PIN" value={form.pin} onChange={e => setForm({...form, pin: e.target.value})} className="bg-slate-900 border border-slate-700 rounded px-2 py-2 text-white text-sm" />
-          <input type="time" value={form.arrivee} onChange={e => setForm({...form, arrivee: e.target.value})} className="bg-slate-900 border border-slate-700 rounded px-2 py-2 text-white text-sm" />
-          <input placeholder="Téléphone" value={form.telephone} onChange={e => setForm({...form, telephone: e.target.value})} className="bg-slate-900 border border-slate-700 rounded px-2 py-2 text-white text-sm" />
-          <button onClick={handleAjouter} className="bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold rounded text-sm">Ajouter</button>
-        </div>
       </div>
     </div>
   );
@@ -652,40 +664,41 @@ const ModulePointage = ({ employes, estAdmin }: any) => {
   const heureStr = heure.toLocaleTimeString('fr-FR');
   const dateStr = heure.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  const pointer = async (type: 'in' | 'out') => {
-    if (!employeChoisi) return;
-    const emp = employes.find((e: any) => e.nom === employeChoisi);
+  // Fonction pour gérer l'arrivée OU le départ automatiquement
+  const gererPointage = async (employeNom: string, pin: string, estAdminAction: boolean = false) => {
+    const emp = employes.find((e: any) => e.nom === employeNom);
     if (!emp) return;
-
-    // 1. Vérification PIN
-    if (pinSaisi !== emp.pin) {
+    if (!estAdminAction && pin !== emp.pin) {
       alert("❌ Code PIN incorrect !");
       return;
     }
 
-    // 2. Blocage des doublons
-    const dejaPointe = pointages.some((p: any) => p.employe === emp.nom && p.date === dateStr && p.type === type);
-    if (dejaPointe) {
-      alert("❌ Cet employé a déjà pointé pour ce créneau aujourd'hui.");
-      return;
-    }
+    // On cherche si l'employé a déjà pointé aujourd'hui
+    const pointageDuJour = pointages.find((p: any) => p.employe === emp.nom && p.date === dateStr);
 
-    const estEnRetard = heure.getHours() > 8 || (heure.getHours() === 8 && heure.getMinutes() > 0);
     try {
-      await addDoc(collection(db, "pointages"), {
-        employe: emp.nom, poste: emp.poste, heure: heureStr, date: dateStr,
-        type: type, statut: type === 'in' ? (estEnRetard ? 'Retard' : 'Présent') : 'Parti', 
-        timestamp: Date.now(),
-        confirmeParPC: false 
-      });
+      if (!pointageDuJour) {
+        // C'est une ARRIVÉE
+        const estEnRetard = heure.getHours() > 8 || (heure.getHours() === 8 && heure.getMinutes() > 0);
+        await addDoc(collection(db, "pointages"), {
+          employe: emp.nom, poste: emp.poste, date: dateStr,
+          heureArrivee: heureStr, 
+          statut: estEnRetard ? 'Retard' : 'Présent',
+          timestampArrivee: Date.now(),
+          confirmeParPC: estAdminAction 
+        });
+        alert(`✅ Arrivée enregistrée pour ${emp.nom} !`);
+      } else {
+        // C'est un DÉPART (on met à jour le document existant)
+        await updateDoc(doc(db, "pointages", pointageDuJour.id), {
+          heureDepart: heureStr,
+          timestampDepart: Date.now(),
+          confirmeParPC: estAdminAction
+        });
+        alert(`✅ Départ enregistré pour ${emp.nom} !`);
+      }
       setEmployeChoisi('');
       setPinSaisi('');
-    } catch (error) { console.error(error); }
-  };
-
-  const confirmerSurPC = async (id: string) => {
-    try {
-      await updateDoc(doc(db, "pointages", id), { confirmeParPC: true });
     } catch (error) { console.error(error); }
   };
 
@@ -707,33 +720,27 @@ const ModulePointage = ({ employes, estAdmin }: any) => {
           {employes.map((emp: any) => (<option key={emp.id} value={emp.nom}>{emp.nom} — {emp.poste}</option>))}
         </select>
         <input type="password" placeholder="Code PIN" value={pinSaisi} onChange={(e) => setPinSaisi(e.target.value)} className="w-full md:w-32 bg-slate-800 border border-slate-700 rounded px-3 py-3 text-white text-center" />
-        <button onClick={() => pointer('in')} disabled={!employeChoisi || !pinSaisi} className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold px-6 py-3 rounded"><LogIn size={20} /> IN</button>
-        <button onClick={() => pointer('out')} disabled={!employeChoisi || !pinSaisi} className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold px-6 py-3 rounded"><LogOut size={20} /> OUT</button>
+        <button onClick={() => gererPointage(employeChoisi, pinSaisi)} disabled={!employeChoisi || !pinSaisi} className="flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold px-6 py-3 rounded">Pointer</button>
       </div>
 
       <div>
-        <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-3">Historique du jour</h3>
+        <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-3">Pointages du jour</h3>
         {pointages.length === 0 ? (
           <p className="text-sm text-slate-500 italic text-center py-4">Aucun pointage enregistré aujourd'hui</p>
         ) : (
-          <div className="space-y-2 max-h-48 overflow-y-auto">
+          <div className="space-y-2 max-h-64 overflow-y-auto">
             {pointages.map((p: any) => (
-              <div key={p.id} className="flex items-center justify-between bg-slate-800/50 rounded-lg p-3 text-sm">
+              <div key={p.id} className="flex flex-col md:flex-row md:items-center justify-between bg-slate-800/50 rounded-lg p-3 text-sm gap-2">
                 <div className="flex items-center gap-3">
-                  {p.type === 'in' ? <LogIn size={16} className="text-green-400" /> : <LogOut size={16} className="text-orange-400" />}
-                  <span className="text-white">{p.employe}</span>
+                  <span className="text-white font-bold">{p.employe}</span>
                   <span className="text-slate-500 text-xs">{p.poste}</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-400 font-mono">{p.heure}</span>
-                  <span className={`text-xs px-2 py-1 rounded ${p.statut === 'Présent' ? 'bg-green-500/20 text-green-400' : p.statut === 'Retard' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>{p.statut}</span>
-                  
-                  {!p.confirmeParPC && estAdmin && (
-                    <button onClick={() => confirmerSurPC(p.id)} className="bg-cyan-500 text-slate-900 px-2 py-1 rounded text-xs font-bold ml-2">Confirmer PC</button>
-                  )}
-                  {p.confirmeParPC && (
-                    <span className="text-xs text-green-400 font-bold ml-2">✅ Validé</span>
-                  )}
+                <div className="flex items-center gap-4 text-xs">
+                  <div className="text-green-400">Arrivée: {p.heureArrivee}</div>
+                  <div className={p.heureDepart ? "text-orange-400" : "text-slate-500 italic"}>
+                    Départ: {p.heureDepart || 'En cours...'}
+                  </div>
+                  {p.statut === 'Retard' && <span className="bg-red-500/20 text-red-400 px-2 py-1 rounded">Retard</span>}
                 </div>
               </div>
             ))}
@@ -757,21 +764,32 @@ const ModulePaie = ({ employes }: any) => {
           </thead>
           <tbody>
             {employes.map((emp: any) => {
-              const score = calculerMotivation(emp);
-              const base = emp.salaireBase || 900;
-              const prime = base * 0.30 * (score / 100);
-              const retardsDeduction = 0;
-              const avances = 0;
-              const net = base + prime - avances - retardsDeduction;
+                          
+const criterePonctualite = emp.ponctualite >= 80 ? 20 : (emp.ponctualite >= 50 ? 10 : 0);
+const criterePresence = emp.presence >= 80 ? 20 : (emp.presence >= 50 ? 10 : 0);
+const critereRespect = 20; // À connecter plus tard
+const critereMarchandises = 20; // À connecter plus tard
+const critereEngagement = 20; // À connecter plus tard
+const critereSixieme = 20; // À connecter plus tard
+
+const scoreGlobal = criterePonctualite + criterePresence + critereRespect + critereMarchandises + critereEngagement + critereSixieme;
+
+const base = emp.salaireBase || 900;
+// Prime : 20% du salaire de base, modulée par le score global
+const prime = (base * 0.20) * (Math.min(scoreGlobal, 100) / 100); 
+
+const retardsDeduction = 0;
+const avances = 0;
+const net = base + prime - avances - retardsDeduction;
               return (
                 <tr key={emp.id} className="border-b border-slate-800 hover:bg-slate-800/50">
                   <td className="px-4 py-3 font-bold text-white">{emp.nom}</td>
-                  <td className="px-4 py-3">${base.toFixed(2)}</td>
-                  <td className={`px-4 py-3 font-bold ${score >= 80 ? 'text-green-400' : score >= 60 ? 'text-orange-400' : 'text-red-400'}`}>{score}</td>
-                  <td className="px-4 py-3 text-green-400">${prime.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-red-400">-${avances.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-red-400">-${retardsDeduction.toFixed(2)}</td>
-                  <td className="px-4 py-3 font-bold text-cyan-400">${net.toFixed(2)}</td>
+                  <td className="px-4 py-3">FCFA{base.toLocaleString('fr-FR')} FCFA</td>
+                  <td className={`px-4 py-3 font-bold FCFA{scoreGlobal >= 80 ? 'text-green-400' : scoreGlobal >= 60 ? 'text-orange-400' : 'text-red-400'}`}>{scoreGlobal}</td>
+                  <td className="px-4 py-3 text-green-400">{prime.toLocaleString('fr-FR')} FCFA</td>
+                  <td className="px-4 py-3 text-red-400">-FCFA{avances.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-red-400">-FCFA{retardsDeduction.toFixed(2)}</td>
+                  <td className="px-4 py-3 font-bold text-cyan-400">{net.toLocaleString('fr-FR')} FCFA</td>
                   <td className="px-4 py-3"><button className="text-slate-400 hover:text-white text-xs bg-slate-800 px-2 py-1 rounded">Fiche</button></td>
                 </tr>
               );
@@ -1162,6 +1180,12 @@ useEffect(() => {
       await addDoc(collection(db, "employees"), { ...data, presence: Number(data.presence || 80), ponctualite: Number(data.ponctualite || 80), productivite: Number(data.productivite || 80) });
     } catch (error) { console.error(error); }
   };
+  const modifierEmploye = async (id: string, salaire: number, pin: string) => {
+  try {
+    await updateDoc(doc(db, "employees", id), { salaireBase: salaire, pin: pin });
+    alert("✅ Informations mises à jour !");
+  } catch (error) { console.error(error); }
+};
 
   const supprimerEmploye = async (id: string) => {
     try { await deleteDoc(doc(db, "employees", id)); } catch (error) { console.error(error); }
@@ -1314,7 +1338,7 @@ if (authCharge) {
       )}
 
       {ongletActif === 'equipe' && (
-        <ModuleEquipe employes={employes} ajouterEmploye={ajouterEmploye} supprimerEmploye={supprimerEmploye} />
+        <ModuleEquipe employes={employes} ajouterEmploye={ajouterEmploye} supprimerEmploye={supprimerEmploye} modifierEmploye={modifierEmploye} />
       )}
 
       {ongletActif === 'paie' && (
